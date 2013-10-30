@@ -31,6 +31,7 @@
 #define _OGR_GEOPACKAGE_H_INCLUDED
 
 #include "ogrsf_frmts.h"
+#include "sqlite3.h"
 
 /************************************************************************/
 /*                           OGRGeoPackageDataSource                       */
@@ -56,13 +57,13 @@ class OGRGeoPackageDataSource : public OGRDataSource
                         OGRGeoPackageDataSource();
                         ~OGRGeoPackageDataSource();
 
-    virtual const char* GetName() { return pszName; }
-    virtual int         GetLayerCount() { return nLayers; }
+    virtual const char* GetName() { return m_pszName; }
+    virtual int         GetLayerCount() { return m_nLayers; }
     virtual OGRLayer*   GetLayer( int );
     virtual int         TestCapability( const char * );
 
-    int                 Open( const char * pszFilename,
-                              int bUpdate );
+    int                 Open( const char * pszFilename, int bUpdate );
+    int                 Create( const char * pszFilename, char **papszOptions );
 
 /*
 
@@ -99,7 +100,8 @@ class OGRGeoPackageDriver : public OGRSFDriver
         ~OGRGeoPackageDriver();
         virtual const char*         GetName();
         virtual OGRDataSource*      Open( const char *, int );
-        
+		virtual OGRDataSource*      CreateDatasource( const char * pszFilename, char **papszOptions );
+		virtual OGRErr              DeleteDataSource( const char * pszFilename );
         virtual int                 TestCapability( const char * ) { return FALSE; }
 };
 

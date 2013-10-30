@@ -37,10 +37,10 @@ CPL_CVSID("$Id$");
 
 OGRGeoPackageDataSource::OGRGeoPackageDataSource()
 {
-    pszName = NULL;
-
-    papoLayers = NULL;
-    nLayers = 0;
+    m_pszName = NULL;
+    m_papoLayers = NULL;
+    m_nLayers = 0;
+    m_poDB = NULL;
 }
 
 /************************************************************************/
@@ -49,118 +49,39 @@ OGRGeoPackageDataSource::OGRGeoPackageDataSource()
 
 OGRGeoPackageDataSource::~OGRGeoPackageDataSource()
 {
-    for( int i = 0; i < nLayers; i++ )
-        delete papoLayers[i];
+    for( int i = 0; i < m_nLayers; i++ )
+        delete m_papoLayers[i];
         
-    CPLFree( papoLayers );
-    CPLFree( pszName );
+    if ( m_poDB )
+        sqlite3_close(m_poDB);
+        
+    CPLFree( m_papoLayers );
+    CPLFree( m_pszName );
 }
 
+/************************************************************************/
+/*                       OpenOrCreate()                                 */
+/* Utility to open and populate member variables                        */
+/************************************************************************/
 
-/************************************************************************/
-/*                       OpenOrCreateDB()                                */
-/************************************************************************/
-int OGRGeoPackageDataSource::OpenOrCreateDB(int flags)
+static int OpenOrCreate(const char * pszFileName)
 {
-    CPLAssert( m_pszName != NULL );
-
-    int rc = sqlite3_open( m_pszName, &m_poDb );
-
-    if( rc != SQLITE_OK )
+    /* See if we can open the SQLite database */
+    int rc = sqlite3_open( pszFilename, &m_poDB );
+    if ( rc != SQLITE_OK )
     {
+        m_poDB = NULL;
         CPLError( CE_Failure, CPLE_OpenFailed,
                   "sqlite3_open(%s) failed: %s",
-                  pszName, sqlite3_errmsg( hDB ) );
+                  pszFilename, sqlite3_errmsg( m_poDB ) );
         return FALSE;
     }
-
-    int nRowCount = 0, nColCount = 0;
-    char** papszResult = NULL;
-    sqlite3_get_table( hDB,
-                       "SELECT name, sql FROM sqlite_master "
-                       "WHERE (type = 'trigger' OR type = 'view') AND ("
-                       "sql LIKE '%%ogr_geocode%%' OR "
-                       "sql LIKE '%%ogr_datasource_load_layers%%' OR "
-                       "sql LIKE '%%ogr_GetConfigOption%%' OR "
-                       "sql LIKE '%%ogr_SetConfigOption%%' )",
-                       &papszResult, &nRowCount, &nColCount,
-                       NULL );
-
-    sqlite3_free_table(papszResult);
-    papszResult = NULL;
-
-    if( nRowCount > 0 )
-    {
-        if( !CSLTestBoolean(CPLGetConfigOption("ALLOW_OGR_SQL_FUNCTIONS_FROM_TRIGGER_AND_VIEW", "NO")) )
-        {
-            CPLError( CE_Failure, CPLE_OpenFailed, "%s", 
-                "A trigger and/or view calls a OGR extension SQL function that could be used to "
-                "steal data, or use network bandwith, without your consent.\n"
-                "The database will not be opened unless the ALLOW_OGR_SQL_FUNCTIONS_FROM_TRIGGER_AND_VIEW "
-                "configuration option to YES.");
-            return FALSE;
-        }
-    }
-
-    const char* pszSqliteJournal = CPLGetConfigOption("OGR_SQLITE_JOURNAL", NULL);
-    if (pszSqliteJournal != NULL)
-    {
-        char* pszErrMsg = NULL;
-        char **papszResult;
-        int nRowCount, nColCount;
-
-        const char* pszSQL = CPLSPrintf("PRAGMA journal_mode = %s",
-                                        pszSqliteJournal);
-
-        rc = sqlite3_get_table( hDB, pszSQL,
-                                &papszResult, &nRowCount, &nColCount,
-                                &pszErrMsg );
-        if( rc == SQLITE_OK )
-        {
-            sqlite3_free_table(papszResult);
-        }
-        else
-        {
-            sqlite3_free( pszErrMsg );
-        }
-    }
-
-    const char* pszSqlitePragma = CPLGetConfigOption("OGR_SQLITE_PRAGMA", NULL);
-    if (pszSqlitePragma != NULL)
-    {
-        char** papszTokens = CSLTokenizeString2( pszSqlitePragma, ",", CSLT_HONOURSTRINGS );
-        for(int i=0; papszTokens[i] != NULL; i++ )
-        {
-            char* pszErrMsg = NULL;
-            char **papszResult;
-            int nRowCount, nColCount;
-
-            const char* pszSQL = CPLSPrintf("PRAGMA %s", papszTokens[i]);
-
-            rc = sqlite3_get_table( hDB, pszSQL,
-                                    &papszResult, &nRowCount, &nColCount,
-                                    &pszErrMsg );
-            if( rc == SQLITE_OK )
-            {
-                sqlite3_free_table(papszResult);
-            }
-            else
-            {
-                sqlite3_free( pszErrMsg );
-            }
-        }
-        CSLDestroy(papszTokens);
-    }
-
-    if (!SetCacheSize())
-        return FALSE;
-
-    if (!SetSynchronous())
-        return FALSE;
-
+        
+    /* Filename is good, store it for future reference */
+    m_pszName = CPLStrdup( pszFilename );
+    
     return TRUE;
 }
-
 
 /************************************************************************/
 /*                                Open()                                */
@@ -179,25 +100,18 @@ int OGRGeoPackageDataSource::Open(const char * pszFilename, int bUpdate )
     /* http://opengis.github.io/geopackage/#_file_extension_name */
     int nLen = strlen(pszFilename);
     if(! (nLen >= 5 && EQUAL(pszFilename + nLen - 5, ".gpkg")) )
-    {
-        CPLError( CE_Failure, CPLE_OpenFailed,
-                  "File '%s' does not end in '.gpkg'",
-                  pszFilename );
         return FALSE;
-    }
 
     /* Check that the filename exists and is a file */
     VSIStatBuf stat;
     if( CPLStat( pszFilename, &stat ) != 0 || !VSI_ISREG(stat.st_mode) )
-    {
-        CPLError( CE_Failure, CPLE_OpenFailed,
-                  "Cannot open file '%s' for reading",
-                  pszFilename );
         return FALSE;
-    }
 
-    /* See if we can open the SQLite database */
-    m_poDb = 
+    /* Try to open the file */
+    if ( ! OpenOrCreate(pszFilename) )
+        return FALSE;
+
+
     
     OGRSQLiteInitSpatialite();
     
@@ -212,13 +126,45 @@ int OGRGeoPackageDataSource::Open(const char * pszFilename, int bUpdate )
 /*                                Create()                              */
 /************************************************************************/
 
-int OGRGeoPackageDataSource::Create( const char * pszNameIn, char **papszOptions )
+int OGRGeoPackageDataSource::Create( const char * pszFilename, char **papszOptions )
 {
     int rc;
     CPLString osCommand;
     char *pszErrMsg = NULL;
 
-    pszName = CPLStrdup( pszNameIn );
+	/* The OGRGeoPackageDriver has already confirmed that the pszFilename */
+	/* is not already in use, so try to open the file */
+    if ( ! OpenOrCreate(pszFilename) )
+        return FALSE;
+
+    /* 1.1.1: A GeoPackage SHALL contain 0x47503130 ("GP10" in ASCII) in the application id */
+    /* http://opengis.github.io/geopackage/#_file_format */
+    char *sql_application_id = "PRAGMA application_id = 0x47503130";
+    rc = sqlite3_exec(m_poDB, sql_application_id, NULL, NULL, &pszErrMsg);
+    if ( rc != SQLITE_OK )
+    {
+        CPLError( CE_Failure, CPLE_OpenFailed,
+                  "sqlite3_exec(%s) failed: %s",
+                  sql_application_id, pszErrMsg );
+        return FALSE;
+    }
+    
+    
+      sqlite3*,                                  /* An open database */
+      const char *sql,                           /* SQL to be evaluated */
+      int (*callback)(void*,int,char**,char**),  /* Callback function */
+      void *,                                    /* 1st argument to callback */
+      char **errmsg                              /* Error msg written here */
+    );
+
+        "PRAGMA application_id = value;"
+
+
+
+
+
+
+
 
     if (!OpenOrCreateDB(0))
         return FALSE;
@@ -252,7 +198,7 @@ int OGRGeoPackageDataSource::Create( const char * pszNameIn, char **papszOptions
             else
                 osCommand =  "SELECT InitSpatialMetadata()";
         }
-        rc = sqlite3_exec( hDB, osCommand, NULL, NULL, &pszErrMsg );
+        rc = sqlite3_exec( poDB, osCommand, NULL, NULL, &pszErrMsg );
         if( rc != SQLITE_OK )
         {
             CPLError( CE_Failure, CPLE_AppDefined,
@@ -276,7 +222,7 @@ int OGRGeoPackageDataSource::Create( const char * pszNameIn, char **papszOptions
             "     coord_dimension INTEGER, "
             "     srid INTEGER,"
             "     geometry_format VARCHAR )";
-        rc = sqlite3_exec( hDB, osCommand, NULL, NULL, &pszErrMsg );
+        rc = sqlite3_exec( poDB, osCommand, NULL, NULL, &pszErrMsg );
         if( rc != SQLITE_OK )
         {
             CPLError( CE_Failure, CPLE_AppDefined,
@@ -292,7 +238,7 @@ int OGRGeoPackageDataSource::Create( const char * pszNameIn, char **papszOptions
             "     auth_name TEXT,"
             "     auth_srid TEXT,"
             "     srtext TEXT)";
-        rc = sqlite3_exec( hDB, osCommand, NULL, NULL, &pszErrMsg );
+        rc = sqlite3_exec( poDB, osCommand, NULL, NULL, &pszErrMsg );
         if( rc != SQLITE_OK )
         {
             CPLError( CE_Failure, CPLE_AppDefined,

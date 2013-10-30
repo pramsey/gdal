@@ -60,7 +60,7 @@ OGRGeoPackageDriver::~OGRGeoPackageDriver()
 
 const char *OGRGeoPackageDriver::GetName()
 {
-    return "GeoPackage";
+    return "GPKG";
 }
 
 
@@ -79,6 +79,63 @@ OGRDataSource *OGRGeoPackageDriver::Open( const char * pszFilename, int bUpdate 
     }
 
     return poDS;
+}
+
+
+/************************************************************************/
+/*                                CreateDatasource()                    */
+/************************************************************************/
+
+OGRDataSource *OGRGeoPackageDriver::CreateDatasource( const char * pszFilename, char **papszOptions )
+{
+	/* First, ensure there isn't any such file yet. */
+    VSIStatBufL sStatBuf;
+
+    if( VSIStatL( pszFilename, &sStatBuf ) == 0 )
+    {
+        CPLError( CE_Failure, CPLE_AppDefined, 
+                  "A file system object called '%s' already exists.",
+                  pszFilename );
+
+        return NULL;
+    }
+	
+    OGRGeoPackageDataSource   *poDS = new OGRGeoPackageDataSource();
+
+    if( !poDS->Create( pszFilename, papszOptions ) )
+    {
+        delete poDS;
+        poDS = NULL;
+    }
+
+    return poDS;
+}
+
+/************************************************************************/
+/*                         DeleteDataSource()                           */
+/************************************************************************/
+
+OGRErr OGRGeoPackageDriver::DeleteDataSource( const char *pszFilename )
+{
+    if (VSIUnlink( pszFilename ) == 0)
+        return OGRERR_NONE;
+    else
+        return OGRERR_FAILURE;
+}
+
+/************************************************************************/
+/*                         TestCapability()                             */
+/************************************************************************/
+
+int OGRSPFDriver::TestCapability( const char * pszCap )
+
+{
+    if( EQUAL(pszCap,ODrCCreateDataSource) )
+        return TRUE;
+    else if( EQUAL(pszCap,ODrCDeleteDataSource) )
+        return TRUE;
+    else
+        return FALSE;
 }
 
 
