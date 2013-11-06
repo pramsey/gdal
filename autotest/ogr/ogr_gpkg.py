@@ -56,7 +56,7 @@ def ogr_gpkg_1():
 
     try:
         gpkg_dr = ogr.GetDriverByName( 'GPKG' )
-        print("got gpkg_dr")
+        print("gpkg_dr is")
         print(gpkg_dr)
         if gpkg_dr is None:
             return 'skip'

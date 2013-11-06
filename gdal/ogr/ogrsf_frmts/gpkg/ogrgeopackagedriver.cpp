@@ -33,16 +33,7 @@
 
 CPL_CVSID("$Id$");
 
-extern "C" void RegisterOGRGeoPackage();
-
-
-/************************************************************************/
-/*                        OGRGeoPackageDriver()                         */
-/************************************************************************/
-
-OGRGeoPackageDriver::OGRGeoPackageDriver()
-{
-}
+// extern "C" void RegisterOGRGeoPackage();
 
 
 /************************************************************************/
@@ -51,7 +42,7 @@ OGRGeoPackageDriver::OGRGeoPackageDriver()
 
 OGRGeoPackageDriver::~OGRGeoPackageDriver()
 {
-}
+} 
 
 
 /************************************************************************/
@@ -83,10 +74,10 @@ OGRDataSource *OGRGeoPackageDriver::Open( const char * pszFilename, int bUpdate 
 
 
 /************************************************************************/
-/*                                CreateDatasource()                    */
+/*                                CreateDataSource()                    */
 /************************************************************************/
 
-OGRDataSource *OGRGeoPackageDriver::CreateDatasource( const char * pszFilename, char **papszOptions )
+OGRDataSource *OGRGeoPackageDriver::CreateDataSource( const char * pszFilename, char **papszOptions )
 {
 	/* First, ensure there isn't any such file yet. */
     VSIStatBufL sStatBuf;

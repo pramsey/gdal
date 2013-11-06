@@ -110,13 +110,12 @@ class OGRGeoPackageDataSource : public OGRDataSource
 class OGRGeoPackageDriver : public OGRSFDriver
 {
     public:
-        OGRGeoPackageDriver();
         ~OGRGeoPackageDriver();
-        virtual const char*         GetName();
-        virtual OGRDataSource*      Open( const char *, int );
-		virtual OGRDataSource*      CreateDatasource( const char * pszFilename, char **papszOptions );
-		virtual OGRErr              DeleteDataSource( const char * pszFilename );
-        virtual int                 TestCapability( const char * );
+        const char*         GetName();
+        OGRDataSource*      Open( const char *, int );
+		OGRDataSource*      CreateDataSource( const char * pszFilename, char **papszOptions );
+		OGRErr              DeleteDataSource( const char * pszFilename );
+        int                 TestCapability( const char * );
 };
 
 
