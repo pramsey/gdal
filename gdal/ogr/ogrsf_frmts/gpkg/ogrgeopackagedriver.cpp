@@ -127,7 +127,7 @@ OGRErr OGRGeoPackageDriver::DeleteDataSource( const char *pszFilename )
 /*                         TestCapability()                             */
 /************************************************************************/
 
-int OGRSPFDriver::TestCapability( const char * pszCap )
+int OGRGeoPackageDriver::TestCapability( const char * pszCap )
 
 {
     if( EQUAL(pszCap,ODrCCreateDataSource) )

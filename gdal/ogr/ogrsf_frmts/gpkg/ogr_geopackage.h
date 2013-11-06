@@ -33,6 +33,11 @@
 #include "ogrsf_frmts.h"
 #include "sqlite3.h"
 
+/* 1.1.1: A GeoPackage SHALL contain 0x47503130 ("GP10" in ASCII) in the application id */
+/* http://opengis.github.io/geopackage/#_file_format */
+/* 0x47503130 = 1196437808 */
+#define GPKG_APPLICATION_ID 1196437808
+
 /************************************************************************/
 /*                           OGRGeoPackageDataSource                       */
 /************************************************************************/
@@ -59,15 +64,24 @@ class OGRGeoPackageDataSource : public OGRDataSource
 
     virtual const char* GetName() { return m_pszName; }
     virtual int         GetLayerCount() { return m_nLayers; }
-    virtual OGRLayer*   GetLayer( int );
-    virtual int         TestCapability( const char * );
+    virtual int         TestCapability( const char * ) { return FALSE; };
 
     int                 Open( const char * pszFilename, int bUpdate );
     int                 Create( const char * pszFilename, char **papszOptions );
 
-/*
 
+    private:
+    
+    OGRErr OpenOrCreate(const char * pszFileName);
+    OGRErr SelectInt(const char * pszSQL, int *i);
+    OGRErr PragmaCheck(const char * pszPragma, const char * pszExpected, int nRowsExpected);
+
+
+    virtual OGRLayer*   GetLayer( int ) { return NULL; };
+    
+/*
     virtual OGRLayer*   GetLayer( int );
+
     virtual OGRLayer    *GetLayerByName(const char *);
 
 
@@ -102,7 +116,7 @@ class OGRGeoPackageDriver : public OGRSFDriver
         virtual OGRDataSource*      Open( const char *, int );
 		virtual OGRDataSource*      CreateDatasource( const char * pszFilename, char **papszOptions );
 		virtual OGRErr              DeleteDataSource( const char * pszFilename );
-        virtual int                 TestCapability( const char * ) { return FALSE; }
+        virtual int                 TestCapability( const char * );
 };
 
 

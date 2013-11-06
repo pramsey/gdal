@@ -102,6 +102,7 @@ void OGRRegisterAll()
 #endif
 #ifdef SQLITE_ENABLED
     RegisterOGRSQLite();
+    RegisterOGRGeoPackage();
 #endif
 #ifdef DODS_ENABLED
     RegisterOGRDODS();
@@ -258,9 +259,6 @@ void OGRRegisterAll()
 #endif
 #ifdef WALK_ENABLED
     RegisterOGRWalk();
-#endif
-#ifdef SQLITE_ENABLED
-    RegisterOGRGeoPackage();
 #endif
 #ifdef CARTODB_ENABLED
     RegisterOGRCartoDB();
