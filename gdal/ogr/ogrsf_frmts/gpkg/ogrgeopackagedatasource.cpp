@@ -313,6 +313,24 @@ int OGRGeoPackageDataSource::Create( const char * pszFilename, char **papszOptio
     if ( OGRERR_NONE != ExecSQL(pszContents) )
         return FALSE;
 
-    
+    /* Requirement 21: A GeoPackage with a gpkg_contents table row with a “features” */
+    /* data_type SHALL contain a gpkg_geometry_columns table or updateable view */
+    /* http://opengis.github.io/geopackage/#_geometry_columns */
+    const char *pszGeometryColumns =        
+        "CREATE TABLE gpkg_geometry_columns ("
+        "table_name TEXT NOT NULL,"
+        "column_name TEXT NOT NULL,"
+        "geometry_type_name TEXT NOT NULL,"
+        "srs_id INTEGER NOT NULL,"
+        "z TINYINT NOT NULL,"
+        "m TINYINT NOT NULL,"
+        "CONSTRAINT pk_geom_cols PRIMARY KEY (table_name, column_name),"
+        "CONSTRAINT uk_gc_table_name UNIQUE (table_name),"
+        "CONSTRAINT fk_gc_tn FOREIGN KEY (table_name) REFERENCES gpkg_contents(table_name),"
+        "CONSTRAINT fk_gc_srs FOREIGN KEY (srs_id) REFERENCES gpkg_spatial_ref_sys (srs_id)"
+        ")";
+    if ( OGRERR_NONE != ExecSQL(pszGeometryColumns) )
+        return FALSE;
+
     return TRUE;
 }
