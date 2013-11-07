@@ -108,6 +108,26 @@ OGRErr OGRGeoPackageDataSource::SelectInt(const char * pszSQL, int *i)
 }
 
 /* Returns the first row of first column of SQL as integer */
+OGRErr OGRGeoPackageDataSource::ExecSQL(const char * pszSQL)
+{
+    CPLAssert( m_poDb != NULL );
+    CPLAssert( pszSQL != NULL );
+
+    char *pszErrMsg = NULL;
+    int rc = sqlite3_exec(m_poDb, pszSQL, NULL, NULL, &pszErrMsg);
+    
+    if ( rc != SQLITE_OK )
+    {
+        CPLError( CE_Failure, CPLE_OpenFailed,
+                  "sqlite3_exec(%s) failed: %s",
+                  pszSQL, pszErrMsg );
+        return OGRERR_FAILURE;
+    }
+    
+    return OGRERR_NONE;
+}
+
+/* Returns the first row of first column of SQL as integer */
 OGRErr OGRGeoPackageDataSource::PragmaCheck(const char * pszPragma, const char * pszExpected, int nRowsExpected)
 {
     CPLAssert( pszPragma != NULL );
@@ -163,7 +183,7 @@ int OGRGeoPackageDataSource::Open(const char * pszFilename, int bUpdate )
 
     m_bUpdate = bUpdate;
 
-    /* 1.1.1: File name has to end in "gpkg" */
+    /* Requirement 3: File name has to end in "gpkg" */
     /* http://opengis.github.io/geopackage/#_file_extension_name */
     int nLen = strlen(pszFilename);
     if(! (nLen >= 5 && EQUAL(pszFilename + nLen - 5, ".gpkg")) )
@@ -178,17 +198,19 @@ int OGRGeoPackageDataSource::Open(const char * pszFilename, int bUpdate )
     if ( OpenOrCreate(pszFilename) != OGRERR_NONE )
         return FALSE;
 
-    /* 1.1.1: A GeoPackage SHALL contain 0x47503130 ("GP10" in ASCII) in the application id */
+    /* Requirement 2: A GeoPackage SHALL contain 0x47503130 ("GP10" in ASCII) */
+    /* in the application id */
     /* http://opengis.github.io/geopackage/#_file_format */
     if ( OGRERR_NONE != PragmaCheck("application_id", CPLSPrintf("%d", GPKG_APPLICATION_ID), 1) )
         return FALSE;
         
-    /* 1.1.1: The SQLite PRAGMA integrity_check SQL command SHALL return “ok” */
+    /* Requirement 6: The SQLite PRAGMA integrity_check SQL command SHALL return “ok” */
     /* http://opengis.github.io/geopackage/#_file_integrity */
     if ( OGRERR_NONE != PragmaCheck("integrity_check", "ok", 1) )
         return FALSE;
     
-    /* 1.1.1: The SQLite PRAGMA foreign_key_check() SQL with no parameter value SHALL return an empty result set */
+    /* Requirement 7: The SQLite PRAGMA foreign_key_check() SQL with no */
+    /* parameter value SHALL return an empty result set */
     /* http://opengis.github.io/geopackage/#_file_integrity */
     /* TBD */
     /* if ( OGRERR_NONE != PragmaCheck("foreign_key_check", "", 0) ) */
@@ -205,45 +227,92 @@ int OGRGeoPackageDataSource::Open(const char * pszFilename, int bUpdate )
 
 int OGRGeoPackageDataSource::Create( const char * pszFilename, char **papszOptions )
 {
-    int rc;
     CPLString osCommand;
-    char *pszErrMsg = NULL;
 
 	/* The OGRGeoPackageDriver has already confirmed that the pszFilename */
 	/* is not already in use, so try to create the file */
     if ( OpenOrCreate(pszFilename) != OGRERR_NONE )
         return FALSE;
 
-    /* 1.1.1: A GeoPackage SHALL contain 0x47503130 ("GP10" in ASCII) in the application id */
+    /* Requirement 2: A GeoPackage SHALL contain 0x47503130 ("GP10" in ASCII) in the application id */
     /* http://opengis.github.io/geopackage/#_file_format */
-    const char *pszSQL = CPLSPrintf("PRAGMA application_id = %d", GPKG_APPLICATION_ID);
-    rc = sqlite3_exec(m_poDb, pszSQL, NULL, NULL, &pszErrMsg);
-    if ( rc != SQLITE_OK )
-    {
-        CPLError( CE_Failure, CPLE_OpenFailed,
-                  "sqlite3_exec(%s) failed: %s",
-                  pszSQL, pszErrMsg );
+    const char *pszPragma = CPLSPrintf("PRAGMA application_id = %d", GPKG_APPLICATION_ID);
+    if ( OGRERR_NONE != ExecSQL(pszPragma) )
         return FALSE;
-    }
-    
-    /* 1.1.2: A GeoPackage SHALL include a gpkg_spatial_ref_sys table */
+        
+    /* Requirement 10: A GeoPackage SHALL include a gpkg_spatial_ref_sys table */
     /* http://opengis.github.io/geopackage/#spatial_ref_sys */
-    const char *pszSpatialRefSys = "CREATE TABLE gpkg_spatial_ref_sys ("
-                                   "srs_name TEXT NOT NULL,"
-                                   "srs_id INTEGER NOT NULL PRIMARY KEY,"
-                                   "organization TEXT NOT NULL,"
-                                   "organization_coordsys_id INTEGER NOT NULL,"
-                                   "definition  TEXT NOT NULL,"
-                                   "description TEXT"
-                                   ")";
-    rc = sqlite3_exec(m_poDb, pszSpatialRefSys, NULL, NULL, &pszErrMsg);
-    if ( rc != SQLITE_OK )
-    {
-        CPLError( CE_Failure, CPLE_OpenFailed,
-                  "sqlite3_exec(%s) failed: %s",
-                  pszSQL, pszErrMsg );
+    const char *pszSpatialRefSys = 
+        "CREATE TABLE gpkg_spatial_ref_sys ("
+        "srs_name TEXT NOT NULL,"
+        "srs_id INTEGER NOT NULL PRIMARY KEY,"
+        "organization TEXT NOT NULL,"
+        "organization_coordsys_id INTEGER NOT NULL,"
+        "definition  TEXT NOT NULL,"
+        "description TEXT"
+        ")";
+    if ( OGRERR_NONE != ExecSQL(pszSpatialRefSys) )
         return FALSE;
-    }
+
+    /* Requirement 11: The gpkg_spatial_ref_sys table in a GeoPackage SHALL */
+    /* contain a record for EPSG:4326, the geodetic WGS84 SRS */
+    /* http://opengis.github.io/geopackage/#spatial_ref_sys */
+    const char *pszSpatialRefSysRecord = 
+        "INSERT INTO gpkg_spatial_ref_sys ("
+        "srs_name, srs_id, organization, organization_coordsys_id, definition, description"
+        ") VALUES ("
+        "'WGS 84 geodetic', 4326, 'EPSG', 4326, '"
+        "GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]]"
+        "', 'longitude/latitude coordinates in decimal degrees on the WGS 84 spheroid'"
+        ")";    
+    if ( OGRERR_NONE != ExecSQL(pszSpatialRefSysRecord) )
+        return FALSE;
+
+    /* Requirement 11: The gpkg_spatial_ref_sys table in a GeoPackage SHALL */
+    /* contain a record with an srs_id of -1, an organization of “NONE”, */
+    /* an organization_coordsys_id of -1, and definition “undefined” */
+    /* for undefined Cartesian coordinate reference systems */
+    /* http://opengis.github.io/geopackage/#spatial_ref_sys */
+    pszSpatialRefSysRecord = 
+        "INSERT INTO gpkg_spatial_ref_sys ("
+        "srs_name, srs_id, organization, organization_coordsys_id, definition, description"
+        ") VALUES ("
+        "'Undefined cartesian SRS', -1, 'NONE', -1, 'undefined', 'undefined cartesian coordinate reference system'"
+        ")";    
+    if ( OGRERR_NONE != ExecSQL(pszSpatialRefSysRecord) )
+        return FALSE;
+
+    /* Requirement 11: The gpkg_spatial_ref_sys table in a GeoPackage SHALL */
+    /* contain a record with an srs_id of 0, an organization of “NONE”, */
+    /* an organization_coordsys_id of 0, and definition “undefined” */
+    /* for undefined geographic coordinate reference systems */
+    /* http://opengis.github.io/geopackage/#spatial_ref_sys */
+    pszSpatialRefSysRecord = 
+        "INSERT INTO gpkg_spatial_ref_sys ("
+        "srs_name, srs_id, organization, organization_coordsys_id, definition, description"
+        ") VALUES ("
+        "'Undefined geographic SRS', 0, 'NONE', 0, 'undefined', 'undefined geographic coordinate reference system'"
+        ")";    
+    if ( OGRERR_NONE != ExecSQL(pszSpatialRefSysRecord) )
+        return FALSE;
+    
+    /* Requirement 13: A GeoPackage file SHALL include a gpkg_contents table */
+    /* http://opengis.github.io/geopackage/#_contents */
+    const char *pszContents =
+        "CREATE TABLE gpkg_contents ("
+        "table_name TEXT NOT NULL PRIMARY KEY,"
+        "data_type TEXT NOT NULL,"
+        "identifier TEXT UNIQUE,"
+        "description TEXT DEFAULT '',"
+        "last_change DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ',CURRENT_TIMESTAMP)),"
+        "min_x DOUBLE, min_y DOUBLE,"
+        "max_x DOUBLE, max_y DOUBLE,"
+        "srs_id INTEGER,"
+        "CONSTRAINT fk_gc_r_srs_id FOREIGN KEY (srs_id) REFERENCES gpkg_spatial_ref_sys(srs_id)"
+        ")";
+    if ( OGRERR_NONE != ExecSQL(pszContents) )
+        return FALSE;
+
     
     return TRUE;
 }

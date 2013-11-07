@@ -75,6 +75,7 @@ class OGRGeoPackageDataSource : public OGRDataSource
     OGRErr OpenOrCreate(const char * pszFileName);
     OGRErr SelectInt(const char * pszSQL, int *i);
     OGRErr PragmaCheck(const char * pszPragma, const char * pszExpected, int nRowsExpected);
+    OGRErr ExecSQL(const char * pszSQL);
 
 
     virtual OGRLayer*   GetLayer( int ) { return NULL; };
