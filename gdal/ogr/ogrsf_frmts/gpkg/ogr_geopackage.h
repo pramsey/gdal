@@ -86,7 +86,8 @@ class OGRGeoPackageDataSource : public OGRDataSource
         virtual int         GetLayerCount() { return m_nLayers; }
         int                 Open( const char * pszFilename, int bUpdate );
         int                 Create( const char * pszFilename, char **papszOptions );
-        OGRLayer*           GetLayer( int );
+        OGRLayer*           GetLayer( int iLayer );
+        int                 DeleteLayer( int iLayer );
         OGRLayer*           CreateLayer( const char * pszLayerName,
                                          OGRSpatialReference * poSpatialRef,
                                          OGRwkbGeometryType eGType,

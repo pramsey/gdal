@@ -107,7 +107,7 @@ OGRSpatialReference* OGRGeoPackageDataSource::GetSpatialRef(int iSrsId)
     OGRErr err = SQLQuery(m_poDb, pszSQL, &oResult);
     if ( err != OGRERR_NONE || oResult.nRowCount != 1 )
     {
-        CPLError( CE_Failure, CPLE_AppDefined, "unable to read srs_id '%d' from gpkg_spatial_ref_sys",
+        CPLError( CE_Warning, CPLE_AppDefined, "unable to read srs_id '%d' from gpkg_spatial_ref_sys",
                   iSrsId);
         SQLResultFree(&oResult);
         return NULL;
@@ -116,7 +116,7 @@ OGRSpatialReference* OGRGeoPackageDataSource::GetSpatialRef(int iSrsId)
     char *pszWkt = SQLResultGetValue(&oResult, 0, 0);
     if ( ! pszWkt )
     {
-        CPLError( CE_Failure, CPLE_AppDefined, "null definition for srs_id '%d' in gpkg_spatial_ref_sys",
+        CPLError( CE_Warning, CPLE_AppDefined, "null definition for srs_id '%d' in gpkg_spatial_ref_sys",
                   iSrsId);
         SQLResultFree(&oResult);
         return NULL;
@@ -127,9 +127,10 @@ OGRSpatialReference* OGRGeoPackageDataSource::GetSpatialRef(int iSrsId)
     
     if ( err != OGRERR_NONE )
     {
-        CPLError( CE_Failure, CPLE_AppDefined, "unable to srs_id '%d' definition wkt: %s",
+        CPLError( CE_Warning, CPLE_AppDefined, "unable to parse srs_id '%d' well-known text '%s'",
                   iSrsId, pszWkt);
         SQLResultFree(&oResult);
+        delete poSpatialRef;
         return NULL;
     }
     
@@ -646,6 +647,57 @@ OGRLayer* OGRGeoPackageDataSource::CreateLayer( const char * pszLayerName,
     m_papoLayers[m_nLayers++] = poLayer;
     return poLayer;
 }
+
+
+/************************************************************************/
+/*                            DeleteLayer()                             */
+/************************************************************************/
+
+int OGRGeoPackageDataSource::DeleteLayer( int iLayer )
+{
+    char *pszSQL;
+    OGRErr err;
+    
+    if( iLayer < 0 || iLayer >= m_nLayers )
+        return OGRERR_FAILURE;
+
+    CPLString osLayerName = m_papoLayers[iLayer]->GetLayerDefn()->GetName();
+
+    CPLDebug( "GPKG", "DeleteLayer(%s)", osLayerName.c_str() );
+
+    /* Delete the layer object and remove the gap in the layers list */
+    delete m_papoLayers[iLayer];
+    memmove( m_papoLayers + iLayer, m_papoLayers + iLayer + 1,
+             sizeof(void *) * (m_nLayers - iLayer - 1) );
+    m_nLayers--;
+
+    if (osLayerName.size() == 0)
+        return OGRERR_NONE;
+
+    pszSQL = sqlite3_mprintf(
+            "DROP TABLE %s",
+             osLayerName.c_str());
+    
+    err = SQLCommand(m_poDb, pszSQL);
+    sqlite3_free(pszSQL);
+
+    pszSQL = sqlite3_mprintf(
+            "DELETE FROM gpkg_geometry_columns WHERE table_name = '%s'",
+             osLayerName.c_str());
+    
+     err = SQLCommand(m_poDb, pszSQL);
+     sqlite3_free(pszSQL);
+    
+     pszSQL = sqlite3_mprintf(
+             "DELETE FROM gpkg_contents WHERE table_name = '%s'",
+              osLayerName.c_str());
+
+      err = SQLCommand(m_poDb, pszSQL);
+      sqlite3_free(pszSQL);
+
+      return OGRERR_NONE;
+}
+
 
 
 /************************************************************************/

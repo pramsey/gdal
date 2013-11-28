@@ -106,15 +106,35 @@ def ogr_gpkg_3():
         return 'fail'
 
     # Test creating a layer with an existing name
-#    lyr = gdaltest.gpkg_ds.CreateLayer( 'a_layer')
-    #gdal.PushErrorHandler('CPLQuietErrorHandler')
-#    lyr = gdaltest.gpkg_ds.CreateLayer( 'a_layer' )
-    #gdal.PopErrorHandler()
-#    if lyr is not None:
-#        gdaltest.post_reason('layer creation should have failed')
-#        return 'fail'
+    gdal.PushErrorHandler('CPLQuietErrorHandler')
+    lyr = gdaltest.gpkg_ds.CreateLayer( 'a_layer')
+    lyr = gdaltest.gpkg_ds.CreateLayer( 'a_layer' )
+    gdal.PopErrorHandler()
+    if lyr is not None:
+        gdaltest.post_reason('layer creation should have failed')
+        return 'fail'
 
     return 'success'
+
+###############################################################################
+# Delete a layer
+
+def ogr_gpkg_4():
+
+    if gdaltest.gpkg_ds.GetLayerCount() != 2:
+        gdaltest.post_reason( 'unexpected number of layers' )
+        return 'fail'
+
+    if gdaltest.gpkg_ds.DeleteLayer(1) != 0:
+        gdaltest.post_reason( 'got error code from DeleteLayer(1)' )
+        return 'fail'
+
+    if gdaltest.gpkg_ds.DeleteLayer(0) != 0:
+        gdaltest.post_reason( 'got error code from DeleteLayer(0)' )
+        return 'fail'
+
+    return 'success'
+
 
 
 ###############################################################################
@@ -124,6 +144,7 @@ gdaltest_list = [
     ogr_gpkg_1,
     ogr_gpkg_2,
     ogr_gpkg_3,
+    ogr_gpkg_4,
 ]
 
 if __name__ == '__main__':
