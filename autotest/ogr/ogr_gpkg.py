@@ -51,31 +51,36 @@ import ogrtest
 def ogr_gpkg_1():
 
     gdaltest.gpkg_ds = None
-
-    print("in test 1");
+    gdaltest.gpkg_dr = None
 
     try:
-        gpkg_dr = ogr.GetDriverByName( 'GPKG' )
-        print("gpkg_dr is")
-        print(gpkg_dr)
-        if gpkg_dr is None:
+        gdaltest.gpkg_dr = ogr.GetDriverByName( 'GPKG' )
+        if gdaltest.gpkg_dr is None:
             return 'skip'
     except:
         return 'skip'
-
-    print("done loading driver")
 
     try:
         os.remove( 'tmp/gpkg_test.gpkg' )
     except:
         pass
 
-    # This is to speed-up the runtime of tests on EXT4 filesystems
-    # Do not use this for production environment if you care about data safety
-    # w.r.t system/OS crashes, unless you know what you are doing.
-    #gdal.SetConfigOption('OGR_SQLITE_SYNCHRONOUS', 'OFF')
+    gdaltest.gpkg_ds = gdaltest.gpkg_dr.CreateDataSource( 'tmp/gpkg_test.gpkg' )
 
-    gdaltest.gpkg_ds = gpkg_dr.CreateDataSource( 'tmp/gpkg_test.gpkg' )
+    if gdaltest.gpkg_ds is not None:
+        return 'success'
+    else:
+        return 'fail'
+
+    gdaltest.gpkg_ds.Destroy()
+
+
+###############################################################################
+# Re-open database to test validity
+
+def ogr_gpkg_2():
+
+    gdaltest.gpkg_ds = gdaltest.gpkg_dr.Open( 'tmp/gpkg_test.gpkg' )
 
     if gdaltest.gpkg_ds is not None:
         return 'success'
@@ -84,10 +89,41 @@ def ogr_gpkg_1():
 
 
 ###############################################################################
+# Create a layer
+
+def ogr_gpkg_3():
+
+    if gdaltest.gpkg_ds is None:
+        return 'skip'
+
+    # Test invalid FORMAT
+    #gdal.PushErrorHandler('CPLQuietErrorHandler')
+    srs = osr.SpatialReference()
+    srs.ImportFromEPSG( 4326 )
+    lyr = gdaltest.gpkg_ds.CreateLayer( 'first_layer', geom_type = ogr.wkbPoint, srs = srs)
+    #gdal.PopErrorHandler()
+    if lyr is None:
+        return 'fail'
+
+    # Test creating a layer with an existing name
+#    lyr = gdaltest.gpkg_ds.CreateLayer( 'a_layer')
+    #gdal.PushErrorHandler('CPLQuietErrorHandler')
+#    lyr = gdaltest.gpkg_ds.CreateLayer( 'a_layer' )
+    #gdal.PopErrorHandler()
+#    if lyr is not None:
+#        gdaltest.post_reason('layer creation should have failed')
+#        return 'fail'
+
+    return 'success'
+
+
+###############################################################################
 
 
 gdaltest_list = [ 
     ogr_gpkg_1,
+    ogr_gpkg_2,
+    ogr_gpkg_3,
 ]
 
 if __name__ == '__main__':

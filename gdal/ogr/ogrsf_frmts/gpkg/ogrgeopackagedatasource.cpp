@@ -181,7 +181,7 @@ int OGRGeoPackageDataSource::GetSrsId(const OGRSpatialReference * poSRS)
         nAuthorityCode = atoi( oSRS.GetAuthorityCode(NULL) );
 
         pszSQL = sqlite3_mprintf(
-                         "SELECT srid FROM gpkg_spatial_ref_sys WHERE "
+                         "SELECT srs_id FROM gpkg_spatial_ref_sys WHERE "
                          "upper(organization) = upper('%q') AND organization_coordsys_id = %d",
                          pszAuthorityName, nAuthorityCode );
         
@@ -501,14 +501,14 @@ OGRLayer* OGRGeoPackageDataSource::CreateLayer( const char * pszLayerName,
     /* Read GEOMETRY_COLUMN option */
     const char* pszGeomColumnName = CSLFetchNameValue(papszOptions, "GEOMETRY_COLUMN");
     if (pszGeomColumnName == NULL)
-        pszGeomColumnName = "geometry";
+        pszGeomColumnName = "geom";
     
     /* Read FID option */
     const char* pszFIDColumnName = CSLFetchNameValue(papszOptions, "FID");
     if (pszFIDColumnName == NULL)
-        pszFIDColumnName = "FID";
+        pszFIDColumnName = "fid";
 
-    if ( strspn(pszFIDColumnName, "`~!@#$%^&*()_+-={}|[]\\:\";'<>?,./") > 0 )
+    if ( strspn(pszFIDColumnName, "`~!@#$%^&*()+-={}|[]\\:\";'<>?,./") > 0 )
     {
         CPLError(CE_Failure, CPLE_AppDefined,
                  "The primary key (%s) name may not contain special characters or spaces", 
@@ -526,7 +526,7 @@ OGRLayer* OGRGeoPackageDataSource::CreateLayer( const char * pszLayerName,
 
     /* Pre-emptively try and avoid sqlite3 syntax errors due to  */
     /* illegal characters */
-    if ( strspn(pszLayerName, "`~!@#$%^&*()_+-={}|[]\\:\";'<>?,./") > 0 )
+    if ( strspn(pszLayerName, "`~!@#$%^&*()+-={}|[]\\:\";'<>?,./") > 0 )
     {
         CPLError(CE_Failure, CPLE_AppDefined,
                  "The layer name may not contain special characters or spaces");
@@ -572,8 +572,8 @@ OGRLayer* OGRGeoPackageDataSource::CreateLayer( const char * pszLayerName,
         pszSQL = sqlite3_mprintf(
             "CREATE TABLE %s ( "
             "%s INTEGER PRIMARY KEY AUTOINCREMENT, "
-            "%s GEOMETRY )",
-             pszLayerName, pszFIDColumnName, pszGeomColumnName);
+            "%s %s )",
+             pszLayerName, pszFIDColumnName, pszGeomColumnName, pszGeometryType);
     }
     else
     {
@@ -597,11 +597,11 @@ OGRLayer* OGRGeoPackageDataSource::CreateLayer( const char * pszLayerName,
 
         /* Update gpkg_geometry_columns with the table info */
         pszSQL = sqlite3_mprintf(
-            "INSERT INTO INTO gpkg_geometry_columns "
+            "INSERT INTO gpkg_geometry_columns "
             "(table_name,column_name,geometry_type_name,srs_id,z,m)"
             " VALUES "
             "('%q','%q','%q',%d,%d,%d)",
-            pszLayerName,pszFIDColumnName,pszGeometryType,
+            pszLayerName,pszGeomColumnName,pszGeometryType,
             nSRSId,bGeometryTypeHasZ,0);
     
         err = SQLCommand(m_poDb, pszSQL);
@@ -611,7 +611,7 @@ OGRLayer* OGRGeoPackageDataSource::CreateLayer( const char * pszLayerName,
 
         /* Update gpkg_contents with the table info */
         pszSQL = sqlite3_mprintf(
-            "INSERT INTO INTO gpkg_contents "
+            "INSERT INTO gpkg_contents "
             "(table_name,data_type,identifier,last_change,srs_id)"
             " VALUES "
             "('%q','features','%q',strftime('%%Y-%%m-%%dT%%H:%%M:%%fZ',CURRENT_TIMESTAMP),%d)",
@@ -641,8 +641,23 @@ OGRLayer* OGRGeoPackageDataSource::CreateLayer( const char * pszLayerName,
         delete poLayer;
         return NULL;
     }
-    
+
     m_papoLayers = (OGRLayer**)CPLRealloc(m_papoLayers,  sizeof(OGRGeoPackageLayer*) * (m_nLayers+1));
     m_papoLayers[m_nLayers++] = poLayer;
     return poLayer;
+}
+
+
+/************************************************************************/
+/*                       TestCapability()                               */
+/************************************************************************/
+
+int OGRGeoPackageDataSource::TestCapability( const char * pszCap )
+{
+    if ( EQUAL(pszCap,ODsCCreateLayer) ||
+         EQUAL(pszCap,ODsCDeleteLayer) )
+    {
+         return TRUE;
+     }
+     return FALSE;
 }

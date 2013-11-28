@@ -84,7 +84,6 @@ class OGRGeoPackageDataSource : public OGRDataSource
 
         virtual const char* GetName() { return m_pszName; }
         virtual int         GetLayerCount() { return m_nLayers; }
-        virtual int         TestCapability( const char * ) { return FALSE; };
         int                 Open( const char * pszFilename, int bUpdate );
         int                 Create( const char * pszFilename, char **papszOptions );
         OGRLayer*           GetLayer( int );
@@ -93,6 +92,7 @@ class OGRGeoPackageDataSource : public OGRDataSource
                                          OGRwkbGeometryType eGType,
                                          char **papszOptions );
     
+        int                 TestCapability( const char * );
         int                 GetSrsId(const OGRSpatialReference * poSRS);
         OGRSpatialReference* GetSpatialRef(int iSrsId);
         sqlite3*            GetDatabaseHandle();

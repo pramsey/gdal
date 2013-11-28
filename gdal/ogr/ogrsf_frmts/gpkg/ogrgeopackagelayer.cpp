@@ -106,37 +106,37 @@ const char* OGRGeoPackageLayer::GetGpkgGeometryType(OGRwkbGeometryType oType)
 OGRFieldType OGRGeoPackageLayer::GetOGRFieldType(const char *pszGpkgType)
 {
     /* Integer types */
-    if ( STRNCASECMP("INTEGER", pszGpkgType, 7) )
+    if ( STRNCASECMP("INTEGER", pszGpkgType, 7) == 0 )
         return OFTInteger;
-    else if ( STRNCASECMP("INT", pszGpkgType, 3) )
+    else if ( STRNCASECMP("INT", pszGpkgType, 3) == 0 )
         return OFTInteger;
-    else if ( STRNCASECMP("MEDIUMINT", pszGpkgType, 9) )
+    else if ( STRNCASECMP("MEDIUMINT", pszGpkgType, 9) == 0 )
         return OFTInteger;
-    else if ( STRNCASECMP("SMALLINT", pszGpkgType, 8) )
+    else if ( STRNCASECMP("SMALLINT", pszGpkgType, 8) == 0 )
         return OFTInteger;
-    else if ( STRNCASECMP("TINYINT", pszGpkgType, 7) )
+    else if ( STRNCASECMP("TINYINT", pszGpkgType, 7) == 0 )
         return OFTInteger;
-    else if ( STRNCASECMP("BOOLEAN", pszGpkgType, 7) )
+    else if ( STRNCASECMP("BOOLEAN", pszGpkgType, 7) == 0 )
         return OFTInteger;
 
     /* Real types */
-    else if ( STRNCASECMP("FLOAT", pszGpkgType, 5) )
+    else if ( STRNCASECMP("FLOAT", pszGpkgType, 5) == 0 )
         return OFTReal;
-    else if ( STRNCASECMP("DOUBLE", pszGpkgType, 6) )
+    else if ( STRNCASECMP("DOUBLE", pszGpkgType, 6) == 0 )
         return OFTReal;
-    else if ( STRNCASECMP("REAL", pszGpkgType, 4) )
+    else if ( STRNCASECMP("REAL", pszGpkgType, 4) == 0 )
         return OFTReal;
         
     /* String/binary types */
-    else if ( STRNCASECMP("TEXT", pszGpkgType, 4) )
+    else if ( STRNCASECMP("TEXT", pszGpkgType, 4) == 0 )
         return OFTString;
-    else if ( STRNCASECMP("BLOB", pszGpkgType, 4) )
+    else if ( STRNCASECMP("BLOB", pszGpkgType, 4) == 0 )
         return OFTBinary;
         
     /* Date types */
-    else if ( STRNCASECMP("DATE", pszGpkgType, 4) )
+    else if ( STRNCASECMP("DATE", pszGpkgType, 4) == 0 )
         return OFTDate;
-    else if ( STRNCASECMP("DATETIME", pszGpkgType, 8) )
+    else if ( STRNCASECMP("DATETIME", pszGpkgType, 8) == 0 )
         return OFTDateTime;
 
     /* Illegal! */
@@ -229,7 +229,7 @@ OGRErr OGRGeoPackageLayer::ReadTableDefinition()
     err = SQLQuery(poDb, pszSQL, &oResultTable);
     sqlite3_free(pszSQL);
 
-    if ( err != OGRERR_NONE || oResultTable.nRowCount > 0 )
+    if ( err != OGRERR_NONE || oResultTable.nRowCount == 0 )
     {
         CPLError( CE_Failure, CPLE_AppDefined, "%s", oResultTable.pszErrMsg );
         SQLResultFree(&oResultContents);
@@ -270,15 +270,30 @@ OGRErr OGRGeoPackageLayer::ReadTableDefinition()
                     SQLResultFree(&oResultTable);
                     return OGRERR_FAILURE;
                 }
-                OGRGeomFieldDefn oGeomField(pszName, oGeomType);
                 
+                if ( m_poFeatureDefn->GetGeomFieldCount() == 0 )
+                {
+                    OGRGeomFieldDefn oGeomField(pszName, oGeomType);
+                    m_poFeatureDefn->AddGeomFieldDefn(&oGeomField);
+                }
+                else if ( m_poFeatureDefn->GetGeomFieldCount() == 1 )
+                {
+                    m_poFeatureDefn->GetGeomFieldDefn(0)->SetType(oGeomType);
+                    m_poFeatureDefn->GetGeomFieldDefn(0)->SetName(pszName);
+                }
+                else
+                {
+                    CPLError(CE_Failure, CPLE_AppDefined, 
+                             "feature definition already has mutliple geometry fields?!?");
+                    return OGRERR_FAILURE;
+                }
+
                 /* Read the SRS */
                 OGRSpatialReference *poSRS = m_poDS->GetSpatialRef(iSrsId);
                 if ( poSRS )
-                    oGeomField.SetSpatialRef(poSRS);
-                
-                /* Add geometry type (only one per table, per GPKG rules */
-                m_poFeatureDefn->AddGeomFieldDefn(&oGeomField);
+                {
+                    m_poFeatureDefn->GetGeomFieldDefn(0)->SetSpatialRef(poSRS);
+                }
             }
             else
             {
