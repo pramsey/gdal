@@ -38,8 +38,28 @@
 /* 0x47503130 = 1196437808 */
 #define GPKG_APPLICATION_ID 1196437808
 
+#define UNDEFINED_SRID 0
+
+  
+
 /************************************************************************/
-/*                           OGRGeoPackageDataSource                       */
+/*                           OGRGeoPackageDriver                        */
+/************************************************************************/
+
+class OGRGeoPackageDriver : public OGRSFDriver
+{
+    public:
+                            ~OGRGeoPackageDriver();
+        const char*         GetName();
+        OGRDataSource*      Open( const char *, int );
+        OGRDataSource*      CreateDataSource( const char * pszFilename, char **papszOptions );
+        OGRErr              DeleteDataSource( const char * pszFilename );
+        int                 TestCapability( const char * );
+};
+
+
+/************************************************************************/
+/*                           OGRGeoPackageDataSource                    */
 /************************************************************************/
 
 class OGRGeoPackageDataSource : public OGRDataSource
@@ -59,26 +79,30 @@ class OGRGeoPackageDataSource : public OGRDataSource
 */
 
     public:
-                        OGRGeoPackageDataSource();
-                        ~OGRGeoPackageDataSource();
+                            OGRGeoPackageDataSource();
+                            ~OGRGeoPackageDataSource();
 
-    virtual const char* GetName() { return m_pszName; }
-    virtual int         GetLayerCount() { return m_nLayers; }
-    virtual int         TestCapability( const char * ) { return FALSE; };
-
-    int                 Open( const char * pszFilename, int bUpdate );
-    int                 Create( const char * pszFilename, char **papszOptions );
-
+        virtual const char* GetName() { return m_pszName; }
+        virtual int         GetLayerCount() { return m_nLayers; }
+        virtual int         TestCapability( const char * ) { return FALSE; };
+        int                 Open( const char * pszFilename, int bUpdate );
+        int                 Create( const char * pszFilename, char **papszOptions );
+        OGRLayer*           GetLayer( int );
+        OGRLayer*           CreateLayer( const char * pszLayerName,
+                                         OGRSpatialReference * poSpatialRef,
+                                         OGRwkbGeometryType eGType,
+                                         char **papszOptions );
+    
+        int                 GetSrsId(const OGRSpatialReference * poSRS);
+        OGRSpatialReference* GetSpatialRef(int iSrsId);
+        sqlite3*            GetDatabaseHandle();
+        OGRErr              AddColumn(const char *pszTableName, const char *pszColumnName, const char *pszColumnType);
 
     private:
     
-    OGRErr OpenOrCreate(const char * pszFileName);
-    OGRErr SelectInt(const char * pszSQL, int *i);
-    OGRErr PragmaCheck(const char * pszPragma, const char * pszExpected, int nRowsExpected);
-    OGRErr ExecSQL(const char * pszSQL);
+        OGRErr OpenOrCreate(const char * pszFileName);
+        OGRErr PragmaCheck(const char * pszPragma, const char * pszExpected, int nRowsExpected);
 
-
-    virtual OGRLayer*   GetLayer( int ) { return NULL; };
     
 /*
     virtual OGRLayer*   GetLayer( int );
@@ -105,20 +129,60 @@ class OGRGeoPackageDataSource : public OGRDataSource
 
 
 /************************************************************************/
-/*                           OGRGeoPackageDriver                        */
+/*                           OGRGeoPackageLayer                         */
 /************************************************************************/
 
-class OGRGeoPackageDriver : public OGRSFDriver
+class OGRGeoPackageLayer : public OGRLayer
 {
+    char*                       m_pszTableName;
+    OGRGeoPackageDataSource*    m_poDS;
+    OGREnvelope*                m_poExtent;
+    OGRFeatureDefn*             m_poFeatureDefn;
+    
     public:
-        ~OGRGeoPackageDriver();
-        const char*         GetName();
-        OGRDataSource*      Open( const char *, int );
-		OGRDataSource*      CreateDataSource( const char * pszFilename, char **papszOptions );
-		OGRErr              DeleteDataSource( const char * pszFilename );
-        int                 TestCapability( const char * );
-};
+    
+                        OGRGeoPackageLayer( OGRGeoPackageDataSource *poDS,
+                                            const char * pszTableName );
+                        ~OGRGeoPackageLayer();
 
+    OGRFeatureDefn*     GetLayerDefn() { return m_poFeatureDefn; }
+    int                 TestCapability( const char * ) { return FALSE; }
+    OGRErr              CreateField( OGRFieldDefn *poField, int bApproxOK = TRUE );
+    
+    virtual void        ResetReading() {}
+    virtual OGRFeature *GetNextFeature() { return NULL; }
+
+
+    OGRErr              ReadTableDefinition();
+    OGRFieldType        GetOGRFieldType(const char *pszGpkgType);
+    const char*         GetGPkgFieldType(OGRFieldType nType);
+    OGRwkbGeometryType  GetOGRGeometryType(const char *pszGpkgType, int bHasZ);
+    const char*         GetGpkgGeometryType(OGRwkbGeometryType oType);
+
+
+/*    
+    virtual OGRErr      SetFeature( OGRFeature *poFeature );
+
+
+
+    virtual OGRFeature *GetFeature( long nFeatureId );
+    virtual int         GetFeatureCount( int );
+
+    virtual void        SetSpatialFilter( OGRGeometry *poGeom ) { SetSpatialFilter(0, poGeom); }
+    virtual void        SetSpatialFilter( int iGeomField, OGRGeometry *poGeom );
+
+    virtual OGRErr      SetAttributeFilter( const char * );
+
+    virtual OGRErr      DeleteFeature( long nFID );
+    virtual OGRErr      CreateFeature( OGRFeature *poFeature );
+
+                                     int bApproxOK = TRUE );
+    virtual OGRErr      CreateGeomField( OGRGeomFieldDefn *poGeomField,
+    virtual OGRErr      DeleteField( int iField );
+    virtual OGRErr      AlterFieldDefn( int iField, OGRFieldDefn* poNewFieldDefn, int nFlags );
+*/
+
+};
 
 
 
