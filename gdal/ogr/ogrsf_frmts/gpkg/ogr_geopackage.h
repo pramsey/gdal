@@ -152,7 +152,7 @@ class OGRGeoPackageLayer : public OGRLayer
                         ~OGRGeoPackageLayer();
 
     OGRFeatureDefn*     GetLayerDefn() { return m_poFeatureDefn; }
-    int                 TestCapability( const char * ) { return FALSE; }
+    int                 TestCapability( const char * );
     OGRErr              CreateField( OGRFieldDefn *poField, int bApproxOK = TRUE );
     
     virtual void        ResetReading() {}

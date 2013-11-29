@@ -390,3 +390,16 @@ OGRErr OGRGeoPackageLayer::CreateField( OGRFieldDefn *poField, int bApproxOK )
     m_poFeatureDefn->AddFieldDefn( poField );
     return OGRERR_NONE;
 }
+
+/************************************************************************/
+/*                      TestCapability()                                */
+/************************************************************************/
+
+int OGRGeoPackageLayer::TestCapability ( const char * pszCap )
+{
+    if ( EQUAL(pszCap, OLCCreateField) )
+    {
+         return TRUE;
+    }
+    return FALSE;
+}
