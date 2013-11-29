@@ -276,6 +276,9 @@ OGRGeoPackageDataSource::~OGRGeoPackageDataSource()
 
 int OGRGeoPackageDataSource::Open(const char * pszFilename, int bUpdate )
 {
+    int i;
+    OGRErr err;
+
     CPLAssert( m_nLayers == 0 );
 
     if ( m_pszName == NULL )
@@ -296,25 +299,98 @@ int OGRGeoPackageDataSource::Open(const char * pszFilename, int bUpdate )
 
     /* Try to open the file */
     if ( OpenOrCreate(pszFilename) != OGRERR_NONE )
+    {
+        CPLError( CE_Failure, CPLE_AppDefined, "unable to access file '%s'", pszFilename);
         return FALSE;
+    }
 
     /* Requirement 2: A GeoPackage SHALL contain 0x47503130 ("GP10" in ASCII) */
     /* in the application id */
     /* http://opengis.github.io/geopackage/#_file_format */
     if ( OGRERR_NONE != PragmaCheck("application_id", CPLSPrintf("%d", GPKG_APPLICATION_ID), 1) )
+    {
+        CPLError( CE_Failure, CPLE_AppDefined, "application_id in '%s' does not match GeoPackage standard value", pszFilename );
         return FALSE;
+    }
         
     /* Requirement 6: The SQLite PRAGMA integrity_check SQL command SHALL return “ok” */
     /* http://opengis.github.io/geopackage/#_file_integrity */
     if ( OGRERR_NONE != PragmaCheck("integrity_check", "ok", 1) )
+    {
+        CPLError( CE_Failure, CPLE_AppDefined, "pragma integrity_check on '%s' failed", pszFilename);
         return FALSE;
+    }
     
     /* Requirement 7: The SQLite PRAGMA foreign_key_check() SQL with no */
     /* parameter value SHALL return an empty result set */
     /* http://opengis.github.io/geopackage/#_file_integrity */
-    /* TBD */
-    /* if ( OGRERR_NONE != PragmaCheck("foreign_key_check", "", 0) ) */
-    /*    return FALSE; */
+    if ( OGRERR_NONE != PragmaCheck("foreign_key_check", "", 0) ) 
+    {
+        CPLError( CE_Failure, CPLE_AppDefined, "pragma foreign_key_check on '%s' failed", pszFilename);
+        return FALSE; 
+    }
+
+    /* Check for requirement metadata tables */
+    /* Requirement 10: gpkg_spatial_ref_sys must exist */
+    /* Requirement 13: gpkg_contents must exist */
+    /* Requirement 21: gpkg_geometry_columns must exist */
+    static std::string aosGpkgTables[] = {
+        "gpkg_geometry_columns",
+        "gpkg_spatial_ref_sys",
+        "gpkg_contents"
+    };
+    
+    for ( i = 0; i < 3; i++ )
+    {
+        SQLResult oResult;
+        char *pszSQL = sqlite3_mprintf("pragma table_info('%s')", aosGpkgTables[i].c_str());
+        err = SQLQuery(m_poDb, pszSQL, &oResult);
+        sqlite3_free(pszSQL);
+        
+        if  ( err != OGRERR_NONE )
+            return FALSE;
+            
+        if ( oResult.nRowCount > 0 )
+        {
+            CPLError( CE_Failure, CPLE_AppDefined, "required GeoPackage table '%s' is missing", aosGpkgTables[i].c_str());
+            SQLResultFree(&oResult);
+            return FALSE;
+        }
+    }
+    
+    /* Load layer definitions for all tables in gpkg_contents & gpkg_geometry_columns */
+    SQLResult oResult;
+    std::string osSQL = 
+        "SELECT c.table_name, c.identifier, c.min_x, c.min_y, c.max_x, c.max_y "
+        "FROM gpkg_geometry_columns g JOIN gpkg_contents c ON (g.table_name = c.table_name)"
+        "WHERE c.data_type = 'features'";
+        
+    err = SQLQuery(m_poDb, osSQL.c_str(), &oResult);
+    if  ( err != OGRERR_NONE )
+        return FALSE;
+
+    if ( oResult.nRowCount > 0 )
+    {
+        m_papoLayers = (OGRLayer**)CPLMalloc(sizeof(OGRGeoPackageLayer*) * oResult.nRowCount);
+    }
+
+    for ( i = 0; i < oResult.nRowCount; i++ )
+    {
+        char *pszTableName = SQLResultGetValue(&oResult, 0, i);
+        if ( ! pszTableName )
+        {
+            CPLError(CE_Warning, CPLE_AppDefined, "unable to read table name for layer(%d)", i);            
+            continue;
+        }
+        OGRGeoPackageLayer *poLayer = new OGRGeoPackageLayer(this, pszTableName);
+        if( OGRERR_NONE != poLayer->ReadTableDefinition() )
+        {
+            delete poLayer;
+            CPLError(CE_Warning, CPLE_AppDefined, "unable to read table definition for '%s'", pszTableName);            
+            continue;
+        }
+        m_papoLayers[m_nLayers++] = poLayer;
+    }
 
     return TRUE;
 }
