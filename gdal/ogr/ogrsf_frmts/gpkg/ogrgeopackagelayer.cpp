@@ -359,11 +359,10 @@ OGRGeoPackageLayer::~OGRGeoPackageLayer()
         
     if ( m_poExtent )
         delete m_poExtent;
-        
+    
     if ( m_poFeatureDefn )
-    {
         m_poFeatureDefn->Release();
-    }
+
 }
 
 

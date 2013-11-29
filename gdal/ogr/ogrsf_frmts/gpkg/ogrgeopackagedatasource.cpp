@@ -70,7 +70,7 @@ OGRErr OGRGeoPackageDataSource::PragmaCheck(const char * pszPragma, const char *
     if( rc != SQLITE_OK )
     {
         CPLError( CE_Failure, CPLE_AppDefined, 
-                  "unable to execute PRAGME %s", pszPragma);
+                  "unable to execute PRAGMA %s", pszPragma);
         return OGRERR_FAILURE;
     }
     
@@ -81,11 +81,10 @@ OGRErr OGRGeoPackageDataSource::PragmaCheck(const char * pszPragma, const char *
         return OGRERR_FAILURE;        
     }
     
-    char *pszGot = papszResult[1];
-    if ( ! EQUAL(pszGot, pszExpected) )
+    if ( nRowCount > 0 && ! EQUAL(papszResult[1], pszExpected) )
     {
         CPLError( CE_Failure, CPLE_AppDefined, "invalid %s (expected '%s', got '%s')",
-                  pszPragma, pszExpected, pszGot);
+                  pszPragma, pszExpected, papszResult[1]);
         return OGRERR_FAILURE;
     }
     
@@ -265,7 +264,7 @@ OGRGeoPackageDataSource::~OGRGeoPackageDataSource()
         
     if ( m_poDb )
         sqlite3_close(m_poDb);
-        
+
     CPLFree( m_papoLayers );
     CPLFree( m_pszName );
 }
@@ -350,7 +349,7 @@ int OGRGeoPackageDataSource::Open(const char * pszFilename, int bUpdate )
         if  ( err != OGRERR_NONE )
             return FALSE;
             
-        if ( oResult.nRowCount > 0 )
+        if ( oResult.nRowCount <= 0 )
         {
             CPLError( CE_Failure, CPLE_AppDefined, "required GeoPackage table '%s' is missing", aosGpkgTables[i].c_str());
             SQLResultFree(&oResult);
@@ -372,24 +371,24 @@ int OGRGeoPackageDataSource::Open(const char * pszFilename, int bUpdate )
     if ( oResult.nRowCount > 0 )
     {
         m_papoLayers = (OGRLayer**)CPLMalloc(sizeof(OGRGeoPackageLayer*) * oResult.nRowCount);
-    }
 
-    for ( i = 0; i < oResult.nRowCount; i++ )
-    {
-        char *pszTableName = SQLResultGetValue(&oResult, 0, i);
-        if ( ! pszTableName )
+        for ( i = 0; i < oResult.nRowCount; i++ )
         {
-            CPLError(CE_Warning, CPLE_AppDefined, "unable to read table name for layer(%d)", i);            
-            continue;
+            char *pszTableName = SQLResultGetValue(&oResult, 0, i);
+            if ( ! pszTableName )
+            {
+                CPLError(CE_Warning, CPLE_AppDefined, "unable to read table name for layer(%d)", i);            
+                continue;
+            }
+            OGRGeoPackageLayer *poLayer = new OGRGeoPackageLayer(this, pszTableName);
+            if( OGRERR_NONE != poLayer->ReadTableDefinition() )
+            {
+                delete poLayer;
+                CPLError(CE_Warning, CPLE_AppDefined, "unable to read table definition for '%s'", pszTableName);            
+                continue;
+            }
+            m_papoLayers[m_nLayers++] = poLayer;
         }
-        OGRGeoPackageLayer *poLayer = new OGRGeoPackageLayer(this, pszTableName);
-        if( OGRERR_NONE != poLayer->ReadTableDefinition() )
-        {
-            delete poLayer;
-            CPLError(CE_Warning, CPLE_AppDefined, "unable to read table definition for '%s'", pszTableName);            
-            continue;
-        }
-        m_papoLayers[m_nLayers++] = poLayer;
     }
 
     return TRUE;
