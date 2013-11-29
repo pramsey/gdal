@@ -24,7 +24,7 @@
  * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
+ * DEALINGS IN THE SOFpszFileNameTWARE.
  ****************************************************************************/
 
 #include "ogr_geopackage.h"
@@ -32,23 +32,80 @@
 
 
 
-OGRErr OGRGeoPackageDataSource::OpenOrCreate(const char * pszFilename)
+/* Cannnot count on the "PRAGMA application_id" command existing */
+/* it is a very recent addition to SQLite. */
+bool OGRGeoPackageDataSource::CheckApplicationId(const char * pszFileName)
 {
-    /* See if we can open the SQLite database */
-    int rc = sqlite3_open( pszFilename, &m_poDb );
-    if ( rc != SQLITE_OK )
+    CPLAssert( m_poDb == NULL );
+    
+    /* "GP10" */
+    static char aGpkgId[4] = {0x47, 0x50, 0x31, 0x30};
+    char aFileId[4];
+    int i;
+
+    /* application_id is 4 bytes at offset 68 in the header */
+    VSILFILE *fp = VSIFOpenL( pszFileName, "rb" );
+    VSIFSeekL(fp, 68, SEEK_SET);
+    VSIFReadL(aFileId, 4, 1, fp);
+    VSIFCloseL(fp);
+    
+    for ( i = 0; i < 4; i++ )
     {
-        m_poDb = NULL;
-        CPLError( CE_Failure, CPLE_OpenFailed, "sqlite3_open(%s) failed: %s",
-                  pszFilename, sqlite3_errmsg( m_poDb ) );
-        return OGRERR_FAILURE;
+        if ( aFileId[i] != aGpkgId[i] )
+            return FALSE;
     }
-        
-    /* Filename is good, store it for future reference */
-    m_pszName = CPLStrdup( pszFilename );
+    return TRUE;
+}
+
+/* ZOMG we can't just edit the header in place, we have to filter */
+/* the whole file and alter just the bytes we care about. Thank god */
+/* we only do this at file creation. */
+OGRErr OGRGeoPackageDataSource::SetApplicationId()
+{
+    CPLAssert( m_poDb != NULL );
+    CPLAssert( m_pszFileName != NULL );
+
+    /* Have to flush the file before f***ing with the header */
+    sqlite3_close(m_poDb);
+
+    /* "GP10" */
+    static char aGpkgId[4] = {0x47, 0x50, 0x31, 0x30};
+    static size_t szGpkgIdPos = 68;
+    const char *pszTmpFile = CPLGenerateTempFilename("ogr_gpkg_tmp");
+    static size_t szBuf = 1024;
+    static size_t szPos = 0;
+    size_t szRead = 0;
+    unsigned char pabyBuf[szBuf];
+
+    /* Read from sqlite file, write to tmp file */
+    VSILFILE *in = VSIFOpenL( m_pszFileName, "rb" );
+    VSILFILE *out = VSIFOpenL( pszTmpFile, "wb" );
+
+    do 
+    {
+        szRead = VSIFReadL(pabyBuf, 1, szBuf, in);
+        if ( szPos < szGpkgIdPos && szGpkgIdPos < (szPos + szRead) )
+        {
+            memcpy(pabyBuf + szGpkgIdPos, aGpkgId, 4);
+        }
+        VSIFWriteL(pabyBuf, 1, szBuf, out);
+        szPos += szRead;
+    }
+    while(szRead == szBuf);
+    VSIFFlushL(out);
+    VSIFCloseL(out);
+    VSIFCloseL(in);
+
+    /* Copy the altered file over the original */
+    VSIUnlink( m_pszFileName );
+    VSIRename( pszTmpFile, m_pszFileName );
+    
+    /* And re-open */
+    sqlite3_open(m_pszFileName, &m_poDb);
     
     return OGRERR_NONE;
 }
+
 
 
 /* Returns the first row of first column of SQL as integer */
@@ -247,7 +304,7 @@ int OGRGeoPackageDataSource::GetSrsId(const OGRSpatialReference * poSRS)
 
 OGRGeoPackageDataSource::OGRGeoPackageDataSource()
 {
-    m_pszName = NULL;
+    m_pszFileName = NULL;
     m_papoLayers = NULL;
     m_nLayers = 0;
     m_poDb = NULL;
@@ -266,7 +323,7 @@ OGRGeoPackageDataSource::~OGRGeoPackageDataSource()
         sqlite3_close(m_poDb);
 
     CPLFree( m_papoLayers );
-    CPLFree( m_pszName );
+    CPLFree( m_pszFileName );
 }
 
 /************************************************************************/
@@ -279,9 +336,11 @@ int OGRGeoPackageDataSource::Open(const char * pszFilename, int bUpdate )
     OGRErr err;
 
     CPLAssert( m_nLayers == 0 );
+    CPLAssert( m_poDb == NULL );
+    CPLAssert( m_pszFileName == NULL );
 
-    if ( m_pszName == NULL )
-        m_pszName = CPLStrdup( pszFilename );
+    if ( m_pszFileName == NULL )
+        m_pszFileName = CPLStrdup( pszFilename );
 
     m_bUpdate = bUpdate;
 
@@ -296,22 +355,28 @@ int OGRGeoPackageDataSource::Open(const char * pszFilename, int bUpdate )
     if( CPLStat( pszFilename, &stat ) != 0 || !VSI_ISREG(stat.st_mode) )
         return FALSE;
 
-    /* Try to open the file */
-    if ( OpenOrCreate(pszFilename) != OGRERR_NONE )
-    {
-        CPLError( CE_Failure, CPLE_AppDefined, "unable to access file '%s'", pszFilename);
-        return FALSE;
-    }
-
     /* Requirement 2: A GeoPackage SHALL contain 0x47503130 ("GP10" in ASCII) */
     /* in the application id */
     /* http://opengis.github.io/geopackage/#_file_format */
-    if ( OGRERR_NONE != PragmaCheck("application_id", CPLSPrintf("%d", GPKG_APPLICATION_ID), 1) )
+    if ( ! CheckApplicationId(pszFilename) )
     {
-        CPLError( CE_Failure, CPLE_AppDefined, "application_id in '%s' does not match GeoPackage standard value", pszFilename );
+        CPLError( CE_Failure, CPLE_AppDefined, "bad application_id on '%s'", pszFilename);
         return FALSE;
     }
-        
+
+    /* See if we can open the SQLite database */
+    int rc = sqlite3_open( pszFilename, &m_poDb );
+    if ( rc != SQLITE_OK )
+    {
+        m_poDb = NULL;
+        CPLError( CE_Failure, CPLE_OpenFailed, "sqlite3_open(%s) failed: %s",
+                  pszFilename, sqlite3_errmsg( m_poDb ) );
+        return FALSE;
+    }
+    
+    /* Filename is good, store it for future reference */
+    m_pszFileName = CPLStrdup( pszFilename );
+
     /* Requirement 6: The SQLite PRAGMA integrity_check SQL command SHALL return “ok” */
     /* http://opengis.github.io/geopackage/#_file_integrity */
     if ( OGRERR_NONE != PragmaCheck("integrity_check", "ok", 1) )
@@ -394,6 +459,8 @@ int OGRGeoPackageDataSource::Open(const char * pszFilename, int bUpdate )
     return TRUE;
 }
 
+
+
 /************************************************************************/
 /*                          GetDatabaseHandle()                         */
 /************************************************************************/
@@ -414,8 +481,16 @@ int OGRGeoPackageDataSource::Create( const char * pszFilename, char **papszOptio
 
 	/* The OGRGeoPackageDriver has already confirmed that the pszFilename */
 	/* is not already in use, so try to create the file */
-    if ( OpenOrCreate(pszFilename) != OGRERR_NONE )
+    int rc = sqlite3_open( pszFilename, &m_poDb );
+    if ( rc != SQLITE_OK )
+    {
+        m_poDb = NULL;
+        CPLError( CE_Failure, CPLE_OpenFailed, "sqlite3_open(%s) failed: %s",
+                  pszFilename, sqlite3_errmsg( m_poDb ) );
         return FALSE;
+    }
+
+    m_pszFileName = CPLStrdup(pszFilename);
 
     /* Requirement 2: A GeoPackage SHALL contain 0x47503130 ("GP10" in ASCII) in the application id */
     /* http://opengis.github.io/geopackage/#_file_format */
@@ -521,6 +596,13 @@ int OGRGeoPackageDataSource::Create( const char * pszFilename, char **papszOptio
         
     if ( OGRERR_NONE != SQLCommand(m_poDb, pszGeometryColumns) )
         return FALSE;
+
+    /* Requirement 2: A GeoPackage SHALL contain 0x47503130 ("GP10" in ASCII) */
+    /* in the application id field of the SQLite database header */
+    /* We have to do this after there's some content so the database file */
+    /* is not zero length */
+    SetApplicationId();
+
 
     return TRUE;
 }

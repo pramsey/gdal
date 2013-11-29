@@ -117,9 +117,36 @@ def ogr_gpkg_3():
     return 'success'
 
 ###############################################################################
-# Delete a layer
+# Close and re-open to test the layer registration
 
 def ogr_gpkg_4():
+
+    if gdaltest.gpkg_ds is None:
+        return 'skip'
+
+    gdaltest.gpkg_ds.Destroy()
+
+    gdal.PushErrorHandler('CPLQuietErrorHandler')
+    gdaltest.gpkg_ds = gdaltest.gpkg_dr.Open( 'tmp/gpkg_test.gpkg' )
+    gdal.PopErrorHandler()
+
+    if gdaltest.gpkg_ds is None:
+        return 'fail'
+
+    if gdaltest.gpkg_ds.GetLayerCount() != 2:
+        gdaltest.post_reason( 'unexpected number of layers' )
+        return 'fail'
+        
+    return 'success'
+
+
+###############################################################################
+# Delete a layer
+
+def ogr_gpkg_5():
+
+    if gdaltest.gpkg_ds is None:
+        return 'skip'
 
     if gdaltest.gpkg_ds.GetLayerCount() != 2:
         gdaltest.post_reason( 'unexpected number of layers' )
@@ -144,6 +171,7 @@ gdaltest_list = [
     ogr_gpkg_2,
     ogr_gpkg_3,
     ogr_gpkg_4,
+    ogr_gpkg_5,
 ]
 
 if __name__ == '__main__':

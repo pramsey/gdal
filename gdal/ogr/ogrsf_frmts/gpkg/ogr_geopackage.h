@@ -40,6 +40,8 @@
 
 #define UNDEFINED_SRID 0
 
+
+
   
 
 /************************************************************************/
@@ -64,7 +66,7 @@ class OGRGeoPackageDriver : public OGRSFDriver
 
 class OGRGeoPackageDataSource : public OGRDataSource
 {
-    char*               m_pszName;
+    char*               m_pszFileName;
     OGRLayer**          m_papoLayers;
     int                 m_nLayers;
     int                 m_bUpdate;
@@ -82,7 +84,7 @@ class OGRGeoPackageDataSource : public OGRDataSource
                             OGRGeoPackageDataSource();
                             ~OGRGeoPackageDataSource();
 
-        virtual const char* GetName() { return m_pszName; }
+        virtual const char* GetName() { return m_pszFileName; }
         virtual int         GetLayerCount() { return m_nLayers; }
         int                 Open( const char * pszFilename, int bUpdate );
         int                 Create( const char * pszFilename, char **papszOptions );
@@ -94,15 +96,18 @@ class OGRGeoPackageDataSource : public OGRDataSource
                                          char **papszOptions );
     
         int                 TestCapability( const char * );
-        int                 GetSrsId(const OGRSpatialReference * poSRS);
-        OGRSpatialReference* GetSpatialRef(int iSrsId);
+        int                 GetSrsId( const OGRSpatialReference * poSRS );
+        OGRSpatialReference* GetSpatialRef( int iSrsId );
         sqlite3*            GetDatabaseHandle();
-        OGRErr              AddColumn(const char *pszTableName, const char *pszColumnName, const char *pszColumnType);
+        OGRErr              AddColumn( const char * pszTableName, 
+                                       const char * pszColumnName, 
+                                       const char * pszColumnType );
 
     private:
     
-        OGRErr OpenOrCreate(const char * pszFileName);
-        OGRErr PragmaCheck(const char * pszPragma, const char * pszExpected, int nRowsExpected);
+        OGRErr              PragmaCheck(const char * pszPragma, const char * pszExpected, int nRowsExpected);
+        bool                CheckApplicationId(const char * pszFileName);
+        OGRErr              SetApplicationId();
 
     
 /*
