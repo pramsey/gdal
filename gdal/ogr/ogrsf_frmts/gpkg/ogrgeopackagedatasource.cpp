@@ -76,9 +76,8 @@ OGRErr OGRGeoPackageDataSource::SetApplicationId()
     static size_t szGpkgIdPos = 68;
 	static size_t szWritten = 0;
 
-    /* Read from sqlite file, write to tmp file */
+    /* Open for modification, write to application id area */
     VSILFILE *pfFile = VSIFOpenL( m_pszFileName, "rb+" );
-
 	VSIFSeekL(pfFile, szGpkgIdPos, SEEK_SET);
 	szWritten = VSIFWriteL(aGpkgId, 1, 4, pfFile);
 	VSIFCloseL(pfFile);
