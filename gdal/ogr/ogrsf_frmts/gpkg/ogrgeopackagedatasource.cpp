@@ -57,9 +57,12 @@ bool OGRGeoPackageDataSource::CheckApplicationId(const char * pszFileName)
     return TRUE;
 }
 
-/* ZOMG we can't just edit the header in place, we have to filter */
-/* the whole file and alter just the bytes we care about. Thank god */
-/* we only do this at file creation. */
+/* Only recent versions of SQLite will let us muck with application_id */
+/* via a PRAGMA statement, so we have to write directly into the */
+/* file header here. */
+/* We do this at the *end* of initialization so that there is */
+/* data to write down to a file, and we'll have a writeable file */
+/* once we close the SQLite connection */
 OGRErr OGRGeoPackageDataSource::SetApplicationId()
 {
     CPLAssert( m_poDb != NULL );
@@ -71,41 +74,27 @@ OGRErr OGRGeoPackageDataSource::SetApplicationId()
     /* "GP10" */
     static char aGpkgId[4] = {0x47, 0x50, 0x31, 0x30};
     static size_t szGpkgIdPos = 68;
-    const char *pszTmpFile = CPLGenerateTempFilename("ogr_gpkg_tmp");
-    static size_t szBuf = 1024;
-    static size_t szPos = 0;
-    size_t szRead = 0;
-    unsigned char pabyBuf[szBuf];
+	static size_t szWritten = 0;
 
     /* Read from sqlite file, write to tmp file */
-    VSILFILE *in = VSIFOpenL( m_pszFileName, "rb" );
-    VSILFILE *out = VSIFOpenL( pszTmpFile, "wb" );
+    VSILFILE *pfFile = VSIFOpenL( m_pszFileName, "rb+" );
 
-    do 
-    {
-        szRead = VSIFReadL(pabyBuf, 1, szBuf, in);
-        if ( szPos < szGpkgIdPos && szGpkgIdPos < (szPos + szRead) )
-        {
-            memcpy(pabyBuf + szGpkgIdPos, aGpkgId, 4);
-        }
-        VSIFWriteL(pabyBuf, 1, szBuf, out);
-        szPos += szRead;
-    }
-    while(szRead == szBuf);
-    VSIFFlushL(out);
-    VSIFCloseL(out);
-    VSIFCloseL(in);
+	VSIFSeekL(pfFile, szGpkgIdPos, SEEK_SET);
+	szWritten = VSIFWriteL(aGpkgId, 1, 4, pfFile);
+	VSIFCloseL(pfFile);
 
-    /* Copy the altered file over the original */
-    VSIUnlink( m_pszFileName );
-    VSIRename( pszTmpFile, m_pszFileName );
-    
-    /* And re-open */
+	/* If we didn't write out exactly four bytes, something */
+	/* terrible has happened */
+	if ( szWritten != 4 )
+	{
+	    return OGRERR_FAILURE;
+	}
+
+    /* And re-open the file */
     sqlite3_open(m_pszFileName, &m_poDb);
-    
+
     return OGRERR_NONE;
 }
-
 
 
 /* Returns the first row of first column of SQL as integer */
