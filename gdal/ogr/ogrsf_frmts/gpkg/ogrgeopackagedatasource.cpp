@@ -40,16 +40,16 @@ bool OGRGeoPackageDataSource::CheckApplicationId(const char * pszFileName)
     
     /* "GP10" */
     static char aGpkgId[4] = {0x47, 0x50, 0x31, 0x30};
+    static size_t szGpkgIdPos = 68;
     char aFileId[4];
-    int i;
 
     /* application_id is 4 bytes at offset 68 in the header */
     VSILFILE *fp = VSIFOpenL( pszFileName, "rb" );
-    VSIFSeekL(fp, 68, SEEK_SET);
+    VSIFSeekL(fp, szGpkgIdPos, SEEK_SET);
     VSIFReadL(aFileId, 4, 1, fp);
     VSIFCloseL(fp);
     
-    for ( i = 0; i < 4; i++ )
+    for ( int i = 0; i < 4; i++ )
     {
         if ( aFileId[i] != aGpkgId[i] )
             return FALSE;
@@ -326,9 +326,6 @@ int OGRGeoPackageDataSource::Open(const char * pszFilename, int bUpdate )
     CPLAssert( m_nLayers == 0 );
     CPLAssert( m_poDb == NULL );
     CPLAssert( m_pszFileName == NULL );
-
-    if ( m_pszFileName == NULL )
-        m_pszFileName = CPLStrdup( pszFilename );
 
     m_bUpdate = bUpdate;
 

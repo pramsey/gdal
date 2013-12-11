@@ -316,6 +316,7 @@ OGRErr OGRGeoPackageLayer::ReadTableDefinition()
     char *pszMaxX = SQLResultGetValue(&oResultContents, 7, 0);
     char *pszMaxY = SQLResultGetValue(&oResultContents, 8, 0);
     
+	/* All the extrema have to be non-NULL for this to make sense */
     if ( pszMinX && pszMinY && pszMaxX && pszMaxY )
     {
         m_poExtent = new OGREnvelope();

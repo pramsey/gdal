@@ -98,9 +98,9 @@ def ogr_gpkg_3():
 
     # Test invalid FORMAT
     #gdal.PushErrorHandler('CPLQuietErrorHandler')
-    srs = osr.SpatialReference()
-    srs.ImportFromEPSG( 4326 )
-    lyr = gdaltest.gpkg_ds.CreateLayer( 'first_layer', geom_type = ogr.wkbPoint, srs = srs)
+    srs4326 = osr.SpatialReference()
+    srs4326.ImportFromEPSG( 4326 )
+    lyr = gdaltest.gpkg_ds.CreateLayer( 'first_layer', geom_type = ogr.wkbPoint, srs = srs4326)
     #gdal.PopErrorHandler()
     if lyr is None:
         return 'fail'
@@ -137,6 +137,17 @@ def ogr_gpkg_4():
         gdaltest.post_reason( 'unexpected number of layers' )
         return 'fail'
         
+    lyr0 = gdaltest.gpkg_ds.GetLayer(0)
+    lyr1 = gdaltest.gpkg_ds.GetLayer(1)
+
+    if lyr0.GetName() != 'first_layer':
+        gdaltest.post_reason( 'unexpected layer name for layer 0' )
+        return 'fail'
+
+    if lyr1.GetName() != 'a_layer':
+        gdaltest.post_reason( 'unexpected layer name for layer 1' )
+        return 'fail'
+        
     return 'success'
 
 
@@ -160,6 +171,59 @@ def ogr_gpkg_5():
         gdaltest.post_reason( 'got error code from DeleteLayer(0)' )
         return 'fail'
 
+    if gdaltest.gpkg_ds.GetLayerCount() != 0:
+        gdaltest.post_reason( 'unexpected number of layers (not 0)' )
+        return 'fail'
+
+    return 'success'
+
+
+###############################################################################
+# Add fields 
+
+def ogr_gpkg_6():
+
+    if gdaltest.gpkg_ds is None:
+        return 'skip'
+
+    srs4326 = osr.SpatialReference()
+    srs4326.ImportFromEPSG( 4326 )
+    lyr = gdaltest.gpkg_ds.CreateLayer( 'field_test_layer', geom_type = ogr.wkbPoint, srs = srs4326)
+    if lyr is None:
+        return 'fail'
+
+    field_defn = ogr.FieldDefn('dummy', ogr.OFTString)
+    ret = lyr.CreateField(field_defn)
+
+    if lyr.GetLayerDefn().GetFieldDefn(1).GetType() != ogr.OFTString:
+        gdaltest.post_reason( 'wrong field type' )
+        return 'fail'
+    
+    gdaltest.gpkg_ds.Destroy()
+
+    gdal.PushErrorHandler('CPLQuietErrorHandler')
+    gdaltest.gpkg_ds = gdaltest.gpkg_dr.Open( 'tmp/gpkg_test.gpkg' )
+    gdal.PopErrorHandler()
+
+    if gdaltest.gpkg_ds is None:
+        return 'fail'
+
+    if gdaltest.gpkg_ds.GetLayerCount() != 1:
+        return 'fail'
+        
+    lyr = gdaltest.gpkg_ds.GetLayer(0)
+    if lyr.GetName() != 'field_test_layer':
+        return 'fail'
+        
+    field_defn_out = lyr.GetLayerDefn().GetFieldDefn(1)
+    if field_defn_out.GetType() != ogr.OFTString:
+        gdaltest.post_reason( 'wrong field type after reopen' )
+        return 'fail'
+        
+    if field_defn_out.GetName() != 'dummy':
+        gdaltest.post_reason( 'wrong field name after reopen' )
+        return 'fail'
+    
     return 'success'
 
 
@@ -172,6 +236,7 @@ gdaltest_list = [
     ogr_gpkg_3,
     ogr_gpkg_4,
     ogr_gpkg_5,
+    ogr_gpkg_6,
 ]
 
 if __name__ == '__main__':
