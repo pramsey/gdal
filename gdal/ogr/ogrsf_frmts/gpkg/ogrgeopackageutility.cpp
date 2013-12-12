@@ -322,14 +322,4 @@ const char* GPkgFieldFromOGR(OGRFieldType nType)
 
 // OGRGeometry->IsEmpty() for empty test
 
-// static size_t GPkgGeometrySize(const OGRGeometry *poGeom) 
-// {
-//     static size_t szHeader = 2 + 1 + 1 + 4 
-//     size_t szGPkg = 
-// }
-//     
-// GByte* GPkgGeometryFromOGC(const OGRGeometry *poGeom)
-// {
-//     
-// }
 
