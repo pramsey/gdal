@@ -31,144 +31,6 @@
 #include "ogrgeopackageutility.h"
 
 
-/* Requirement 20: A GeoPackage SHALL store feature table geometries */
-/* with the basic simple feature geometry types (Geometry, Point, */
-/* LineString, Polygon, MultiPoint, MultiLineString, MultiPolygon, */
-/* GeomCollection) */
-/* http://opengis.github.io/geopackage/#geometry_types */
-OGRwkbGeometryType OGRGeoPackageLayer::GetOGRGeometryType(const char *pszGpkgType, int bHasZ)
-{
-    OGRwkbGeometryType oType;
-    
-    if ( EQUAL("Geometry", pszGpkgType) )
-        oType = wkbUnknown;
-    else if ( EQUAL("Point", pszGpkgType) )
-        oType =  wkbPoint;
-    else if ( EQUAL("LineString", pszGpkgType) )
-        oType =  wkbLineString;
-    else if ( EQUAL("Polygon", pszGpkgType) )
-        oType =  wkbPolygon;
-    else if ( EQUAL("MultiPoint", pszGpkgType) )
-        oType =  wkbMultiPoint;
-    else if ( EQUAL("MultiLineString", pszGpkgType) )
-        oType =  wkbMultiLineString;
-    else if ( EQUAL("MultiPolygon", pszGpkgType) )
-        oType =  wkbMultiPolygon;
-    else if ( EQUAL("GeometryCollection", pszGpkgType) )
-        oType =  wkbGeometryCollection;
-    else
-        oType =  wkbNone;
-
-    if ( (oType != wkbNone) && bHasZ )
-    {
-        unsigned int oi = oType;
-        oi &= wkb25DBit;
-        oType = (OGRwkbGeometryType)oi;
-    }
-
-    return oType;
-}
-
-/* Requirement 20: A GeoPackage SHALL store feature table geometries */
-/* with the basic simple feature geometry types (Geometry, Point, */
-/* LineString, Polygon, MultiPoint, MultiLineString, MultiPolygon, */
-/* GeomCollection) */
-/* http://opengis.github.io/geopackage/#geometry_types */
-const char* OGRGeoPackageLayer::GetGpkgGeometryType(OGRwkbGeometryType oType)
-{
-    oType = wkbFlatten(oType);
-    
-    switch(oType)
-    {
-        case wkbPoint:
-            return "point";
-        case wkbLineString:
-            return "linestring";
-        case wkbPolygon:
-            return "polygon";
-        case wkbMultiPoint:
-            return "multipoint";
-        case wkbMultiLineString:
-            return "multilinestring";
-        case wkbMultiPolygon:
-            return "multipolygon";
-        case wkbGeometryCollection:
-            return "geometrycollection";
-        default:
-            return NULL;
-    }
-}
-
-/* Requirement 5: The columns of tables in a GeoPackage SHALL only be */
-/* declared using one of the data types specified in table GeoPackage */
-/* Data Types. */
-/* http://opengis.github.io/geopackage/#table_column_data_types */
-OGRFieldType OGRGeoPackageLayer::GetOGRFieldType(const char *pszGpkgType)
-{
-    /* Integer types */
-    if ( STRNCASECMP("INTEGER", pszGpkgType, 7) == 0 )
-        return OFTInteger;
-    else if ( STRNCASECMP("INT", pszGpkgType, 3) == 0 )
-        return OFTInteger;
-    else if ( STRNCASECMP("MEDIUMINT", pszGpkgType, 9) == 0 )
-        return OFTInteger;
-    else if ( STRNCASECMP("SMALLINT", pszGpkgType, 8) == 0 )
-        return OFTInteger;
-    else if ( STRNCASECMP("TINYINT", pszGpkgType, 7) == 0 )
-        return OFTInteger;
-    else if ( STRNCASECMP("BOOLEAN", pszGpkgType, 7) == 0 )
-        return OFTInteger;
-
-    /* Real types */
-    else if ( STRNCASECMP("FLOAT", pszGpkgType, 5) == 0 )
-        return OFTReal;
-    else if ( STRNCASECMP("DOUBLE", pszGpkgType, 6) == 0 )
-        return OFTReal;
-    else if ( STRNCASECMP("REAL", pszGpkgType, 4) == 0 )
-        return OFTReal;
-        
-    /* String/binary types */
-    else if ( STRNCASECMP("TEXT", pszGpkgType, 4) == 0 )
-        return OFTString;
-    else if ( STRNCASECMP("BLOB", pszGpkgType, 4) == 0 )
-        return OFTBinary;
-        
-    /* Date types */
-    else if ( STRNCASECMP("DATE", pszGpkgType, 4) == 0 )
-        return OFTDate;
-    else if ( STRNCASECMP("DATETIME", pszGpkgType, 8) == 0 )
-        return OFTDateTime;
-
-    /* Illegal! */
-    else 
-        return (OGRFieldType)(OFTMaxType + 1);
-}
-
-/* Requirement 5: The columns of tables in a GeoPackage SHALL only be */
-/* declared using one of the data types specified in table GeoPackage */
-/* Data Types. */
-/* http://opengis.github.io/geopackage/#table_column_data_types */
-const char* OGRGeoPackageLayer::GetGPkgFieldType(OGRFieldType nType)
-{
-    switch(nType)
-    {
-        case OFTInteger:
-            return "INTEGER";
-        case OFTReal:
-            return "REAL";
-        case OFTString:
-            return "TEXT";
-        case OFTBinary:
-            return "BLOB";
-        case OFTDate:
-            return "DATE";
-        case OFTDateTime:
-            return "DATETIME";
-        default:
-            return NULL;
-    }
-}
-
 
 OGRErr OGRGeoPackageLayer::ReadTableDefinition()
 {
@@ -250,16 +112,16 @@ OGRErr OGRGeoPackageLayer::ReadTableDefinition()
     {
         char *pszName = SQLResultGetValue(&oResultTable, 1, iRecord);
         char *pszType = SQLResultGetValue(&oResultTable, 2, iRecord);
-        OGRFieldType oType = GetOGRFieldType(pszType);
+        OGRFieldType oType = GPkgFieldToOGR(pszType);
 
         /* Not a standard field type... */
         if ( oType > OFTMaxType )
         {
             /* Maybe it's a geometry type? */
-            OGRwkbGeometryType oGeomType = GetOGRGeometryType(pszType, bHasZ);
+            OGRwkbGeometryType oGeomType = GPkgGeometryTypeToWKB(pszType, bHasZ);
             if ( oGeomType != wkbNone )
             {
-                OGRwkbGeometryType oGeomTypeGeomCols = GetOGRGeometryType(pszGeomColsType, bHasZ);
+                OGRwkbGeometryType oGeomTypeGeomCols = GPkgGeometryTypeToWKB(pszGeomColsType, bHasZ);
                 /* Enforce consistency between table and metadata */
                 if ( oGeomType != oGeomTypeGeomCols )
                 {
@@ -383,7 +245,7 @@ OGRErr OGRGeoPackageLayer::CreateField( OGRFieldDefn *poField, int bApproxOK )
 
     OGRErr err = m_poDS->AddColumn(m_pszTableName, 
                                    poField->GetNameRef(), 
-                                   GetGPkgFieldType(poField->GetType()));
+                                   GPkgFieldFromOGR(poField->GetType()));
 
     if ( err != OGRERR_NONE )
         return err;

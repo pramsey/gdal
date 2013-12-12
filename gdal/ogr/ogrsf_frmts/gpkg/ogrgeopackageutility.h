@@ -53,4 +53,10 @@ char* SQLResultGetColumn(const SQLResult * poResult, int iColumnNum);
 char* SQLResultGetValue(const SQLResult * poResult, int iColumnNum, int iRowNum);
 OGRErr SQLResultFree(SQLResult * poResult);
 
+OGRFieldType        GPkgFieldToOGR(const char *pszGpkgType);
+const char*         GPkgFieldFromOGR(OGRFieldType nType);
+OGRwkbGeometryType  GPkgGeometryTypeToWKB(const char *pszGpkgType, int bHasZ);
+const char*         GPkgGeometryTypeFromWKB(OGRwkbGeometryType oType);
+
+
 #endif

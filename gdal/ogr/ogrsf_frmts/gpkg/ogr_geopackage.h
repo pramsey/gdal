@@ -161,10 +161,6 @@ class OGRGeoPackageLayer : public OGRLayer
 
 
     OGRErr              ReadTableDefinition();
-    OGRFieldType        GetOGRFieldType(const char *pszGpkgType);
-    const char*         GetGPkgFieldType(OGRFieldType nType);
-    OGRwkbGeometryType  GetOGRGeometryType(const char *pszGpkgType, int bHasZ);
-    const char*         GetGpkgGeometryType(OGRwkbGeometryType oType);
 
 
 /*    
