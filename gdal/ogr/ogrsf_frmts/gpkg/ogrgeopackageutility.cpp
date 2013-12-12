@@ -319,8 +319,17 @@ const char* GPkgFieldFromOGR(OGRFieldType nType)
 *     WKBGeometry geometry;          
 *   }
 */
-GByte* GPkgGeometryFromOGC(const OGRGeometry *poGeom)
-{
-    
-}
+
+// OGRGeometry->IsEmpty() for empty test
+
+// static size_t GPkgGeometrySize(const OGRGeometry *poGeom) 
+// {
+//     static size_t szHeader = 2 + 1 + 1 + 4 
+//     size_t szGPkg = 
+// }
+//     
+// GByte* GPkgGeometryFromOGC(const OGRGeometry *poGeom)
+// {
+//     
+// }
 
