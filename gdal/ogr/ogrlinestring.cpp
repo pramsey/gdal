@@ -1125,7 +1125,7 @@ OGRErr OGRLineString::exportToWkt( char ** ppszDstText ) const
 /* -------------------------------------------------------------------- */
 /*      Handle special empty case.                                      */
 /* -------------------------------------------------------------------- */
-    if( nPointCount == 0 )
+    if( IsEmpty() )
     {
         CPLString osEmpty;
         osEmpty.Printf("%s EMPTY",getGeometryName());
@@ -1289,7 +1289,7 @@ void OGRLineString::getEnvelope( OGREnvelope * psEnvelope ) const
 {
     double      dfMinX, dfMinY, dfMaxX, dfMaxY;
 
-    if( nPointCount == 0 )
+    if( IsEmpty() )
     {
         psEnvelope->MinX = 0;
         psEnvelope->MaxX = 0;
@@ -1331,7 +1331,7 @@ void OGRLineString::getEnvelope( OGREnvelope3D * psEnvelope ) const
 
     double      dfMinZ, dfMaxZ;
 
-    if( nPointCount == 0 || padfZ == NULL )
+    if( IsEmpty() || padfZ == NULL )
     {
         psEnvelope->MinZ = 0;
         psEnvelope->MaxZ = 0;
@@ -1367,6 +1367,9 @@ OGRBoolean OGRLineString::Equals( OGRGeometry * poOther ) const
     if( poOther->getGeometryType() != getGeometryType() )
         return FALSE;
 
+    if( IsEmpty() && poOther->IsEmpty() )
+        return TRUE;
+    
     // we should eventually test the SRS.
 
     if( getNumPoints() != poOLine->getNumPoints() )

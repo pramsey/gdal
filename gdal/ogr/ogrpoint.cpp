@@ -464,7 +464,7 @@ OGRErr OGRPoint::exportToWkt( char ** ppszDstText ) const
     char        szTextEquiv[140];
     char        szCoordinate[80];
 
-    if (nCoordDimension == 0)
+    if ( IsEmpty() )
         *ppszDstText = CPLStrdup( "POINT EMPTY" );
     else
     {
@@ -570,6 +570,9 @@ OGRBoolean OGRPoint::Equals( OGRGeometry * poOther ) const
     
     if( poOther->getGeometryType() != getGeometryType() )
         return FALSE;
+
+    if ( IsEmpty() && poOther->IsEmpty() )
+        return TRUE;
 
     // we should eventually test the SRS.
     

@@ -722,8 +722,7 @@ OGRErr OGRPolygon::exportToWkt( char ** ppszDstText ) const
 /* -------------------------------------------------------------------- */
 /*      If we have no valid exterior ring, return POLYGON EMPTY.        */
 /* -------------------------------------------------------------------- */
-    if (getExteriorRing() == NULL ||
-        getExteriorRing()->IsEmpty())
+    if ( IsEmpty() )
     {
         *ppszDstText = CPLStrdup("POLYGON EMPTY");
         return OGRERR_NONE;
@@ -810,7 +809,7 @@ error:
 int OGRPolygon::PointOnSurface( OGRPoint *poPoint ) const
 
 {
-    if( poPoint == NULL )
+    if( poPoint == NULL || poPoint->IsEmpty() )
         return OGRERR_FAILURE;
 
     OGRGeometryH hInsidePoint = OGR_G_PointOnSurface( (OGRGeometryH) this );
@@ -933,6 +932,9 @@ OGRBoolean OGRPolygon::Equals( OGRGeometry * poOther ) const
     
     if( poOther->getGeometryType() != getGeometryType() )
         return FALSE;
+
+    if ( IsEmpty() && poOther->IsEmpty() )
+        return TRUE;
 
     if( getNumInteriorRings() != poOPoly->getNumInteriorRings() )
         return FALSE;
@@ -1075,7 +1077,7 @@ void OGRPolygon::setCoordinateDimension( int nNewDimension )
 OGRBoolean OGRPolygon::IsEmpty(  ) const
 {
     for( int iRing = 0; iRing < nRingCount; iRing++ )
-        if (papoRings[iRing]->IsEmpty() == FALSE)
+        if (papoRings[iRing] && papoRings[iRing]->IsEmpty() == FALSE)
             return FALSE;
     return TRUE;
 }
