@@ -74,20 +74,20 @@ OGRErr OGRGeoPackageDataSource::SetApplicationId()
     /* "GP10" */
     static char aGpkgId[4] = {0x47, 0x50, 0x31, 0x30};
     static size_t szGpkgIdPos = 68;
-	static size_t szWritten = 0;
+    size_t szWritten = 0;
 
     /* Open for modification, write to application id area */
     VSILFILE *pfFile = VSIFOpenL( m_pszFileName, "rb+" );
-	VSIFSeekL(pfFile, szGpkgIdPos, SEEK_SET);
-	szWritten = VSIFWriteL(aGpkgId, 1, 4, pfFile);
-	VSIFCloseL(pfFile);
+    VSIFSeekL(pfFile, szGpkgIdPos, SEEK_SET);
+    szWritten = VSIFWriteL(aGpkgId, 1, 4, pfFile);
+    VSIFCloseL(pfFile);
 
-	/* If we didn't write out exactly four bytes, something */
-	/* terrible has happened */
-	if ( szWritten != 4 )
-	{
-	    return OGRERR_FAILURE;
-	}
+    /* If we didn't write out exactly four bytes, something */
+    /* terrible has happened */
+    if ( szWritten != 4 )
+    {
+        return OGRERR_FAILURE;
+    }
 
     /* And re-open the file */
     sqlite3_open(m_pszFileName, &m_poDb);
@@ -827,17 +827,17 @@ int OGRGeoPackageDataSource::DeleteLayer( int iLayer )
             "DELETE FROM gpkg_geometry_columns WHERE table_name = '%s'",
              osLayerName.c_str());
     
-     err = SQLCommand(m_poDb, pszSQL);
-     sqlite3_free(pszSQL);
+    err = SQLCommand(m_poDb, pszSQL);
+    sqlite3_free(pszSQL);
     
-     pszSQL = sqlite3_mprintf(
+    pszSQL = sqlite3_mprintf(
              "DELETE FROM gpkg_contents WHERE table_name = '%s'",
               osLayerName.c_str());
 
-      err = SQLCommand(m_poDb, pszSQL);
-      sqlite3_free(pszSQL);
+    err = SQLCommand(m_poDb, pszSQL);
+    sqlite3_free(pszSQL);
 
-      return OGRERR_NONE;
+    return OGRERR_NONE;
 }
 
 
@@ -852,6 +852,6 @@ int OGRGeoPackageDataSource::TestCapability( const char * pszCap )
          EQUAL(pszCap,ODsCDeleteLayer) )
     {
          return TRUE;
-     }
-     return FALSE;
+    }
+    return FALSE;
 }

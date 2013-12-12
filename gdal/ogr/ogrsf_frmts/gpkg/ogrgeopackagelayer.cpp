@@ -393,12 +393,27 @@ OGRErr OGRGeoPackageLayer::CreateField( OGRFieldDefn *poField, int bApproxOK )
 }
 
 /************************************************************************/
+/*                      CreateFeature()                                 */
+/************************************************************************/
+
+OGRErr OGRGeoPackageLayer::CreateFeature( OGRFeature *poFeater )
+{
+
+
+	return OGRERR_NONE;
+}
+
+/************************************************************************/
 /*                      TestCapability()                                */
 /************************************************************************/
 
 int OGRGeoPackageLayer::TestCapability ( const char * pszCap )
 {
     if ( EQUAL(pszCap, OLCCreateField) )
+    {
+         return TRUE;
+    }
+    if ( EQUAL(pszCap, OLCSequentialWrite) )
     {
          return TRUE;
     }

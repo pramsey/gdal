@@ -157,6 +157,7 @@ class OGRGeoPackageLayer : public OGRLayer
     
     virtual void        ResetReading() {}
     virtual OGRFeature *GetNextFeature() { return NULL; }
+	OGRErr				CreateFeature( OGRFeature *poFeater );
 
 
     OGRErr              ReadTableDefinition();
