@@ -1459,17 +1459,25 @@ OGRErr OGRReadWKBGeometryType( unsigned char * pabyData, OGRwkbGeometryType *peG
         bIs3D = TRUE;        
     }
     
-    /* ISO SQL/MM style Z types? */
-    if ( 1000 < iRawType && iRawType < 2000 )
+    /* ISO SQL/MM style Z types (between 1001 and 1007)? */
+    if ( iRawType >= 1001 && iRawType <= 1007 )
     {
         /* Remove the ISO padding */
         iRawType -= 1000;
         bIs3D = TRUE;
     }
+    
+    /* Sometimes the Z flag is in the 2nd byte? */
+    if ( iRawType & (wkb25DBit >> 16) )
+    {
+        /* Clean off top 3 bytes */
+        iRawType &= 0x000000FF;
+        bIs3D = TRUE;        
+    }
 
     /* Nothing left but (hopefully) basic 2D types */
 
-    /* Error out on unhandled types */
+    /* What if what we have is still out of range? */
     if ( iRawType < 1 || iRawType > wkbGeometryCollection )
     {
         CPLError(CE_Failure, CPLE_NotSupported, "Unsupported WKB type %d", iRawType);            

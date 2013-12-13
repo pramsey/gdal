@@ -721,7 +721,8 @@ OGRErr OGRPolygon::exportToWkt( char ** ppszDstText ) const
 /* -------------------------------------------------------------------- */
 /*      If we have no valid exterior ring, return POLYGON EMPTY.        */
 /* -------------------------------------------------------------------- */
-    if ( IsEmpty() )
+    if (getExteriorRing() == NULL || 
+        getExteriorRing()->IsEmpty() )
     {
         *ppszDstText = CPLStrdup("POLYGON EMPTY");
         return OGRERR_NONE;
@@ -1076,7 +1077,7 @@ void OGRPolygon::setCoordinateDimension( int nNewDimension )
 OGRBoolean OGRPolygon::IsEmpty(  ) const
 {
     for( int iRing = 0; iRing < nRingCount; iRing++ )
-        if (papoRings[iRing] && papoRings[iRing]->IsEmpty() == FALSE)
+        if ( papoRings[iRing]->IsEmpty() == FALSE )
             return FALSE;
     return TRUE;
 }

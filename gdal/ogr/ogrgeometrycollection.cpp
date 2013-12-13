@@ -783,7 +783,7 @@ OGRErr OGRGeometryCollection::exportToWkt( char ** ppszDstText ) const
     int         iGeom, nCumulativeLength = 0;
     OGRErr      eErr;
 
-    if( IsEmpty() )
+    if( getNumGeometries() == 0 )
     {
         *ppszDstText = CPLStrdup("GEOMETRYCOLLECTION EMPTY");
         return OGRERR_NONE;
