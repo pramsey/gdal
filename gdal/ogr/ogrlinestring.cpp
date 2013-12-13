@@ -66,14 +66,20 @@ OGRLineString::~OGRLineString()
 /*                          getGeometryType()                           */
 /************************************************************************/
 
-OGRwkbGeometryType OGRLineString::getGeometryType() const
+OGRwkbGeometryType OGRLineString::getGeometryType(OGRwkbVariant eWkbVariant) const
 
 {
-    if( getCoordinateDimension() == 3 )
-        return wkbLineString25D;
+    if( nCoordDimension == 3 )
+    {
+        if ( eWkbVariant == wkbVariantIso )
+            return wkbLineStringIsoZ;
+        else
+            return wkbLineString25D;
+    }
     else
-        return wkbLineString;
+        return wkbLineString;    
 }
+
 
 /************************************************************************/
 /*                            flattenTo2D()                             */
@@ -919,7 +925,8 @@ OGRErr OGRLineString::importFromWkb( unsigned char * pabyData,
 /************************************************************************/
 
 OGRErr  OGRLineString::exportToWkb( OGRwkbByteOrder eByteOrder,
-                               unsigned char * pabyData ) const
+                                    unsigned char * pabyData,
+                                    OGRwkbVariant eWkbVariant ) const
 
 {
 /* -------------------------------------------------------------------- */
@@ -930,7 +937,7 @@ OGRErr  OGRLineString::exportToWkb( OGRwkbByteOrder eByteOrder,
 /* -------------------------------------------------------------------- */
 /*      Set the geometry feature type.                                  */
 /* -------------------------------------------------------------------- */
-    GUInt32 nGType = getGeometryType();
+    GUInt32 nGType = getGeometryType(eWkbVariant);
     
     if( eByteOrder == wkbNDR )
         nGType = CPL_LSBWORD32( nGType );

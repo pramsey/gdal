@@ -44,14 +44,20 @@ OGRMultiPolygon::OGRMultiPolygon()
 /*                          getGeometryType()                           */
 /************************************************************************/
 
-OGRwkbGeometryType OGRMultiPolygon::getGeometryType() const
+OGRwkbGeometryType OGRMultiPolygon::getGeometryType(OGRwkbVariant eWkbVariant) const
 
 {
     if( getCoordinateDimension() == 3 )
-        return wkbMultiPolygon25D;
+    {
+        if ( eWkbVariant == wkbVariantIso )
+            return wkbMultiPolygonIsoZ;
+        else
+            return wkbMultiPolygon25D;
+    }
     else
         return wkbMultiPolygon;
 }
+
 
 /************************************************************************/
 /*                            getDimension()                            */

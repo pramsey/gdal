@@ -127,15 +127,18 @@ void OGRGeometry::dumpReadable( FILE * fp, const char * pszPrefix, char** papszO
             case wkbNone:
             case wkbPoint:
             case wkbPoint25D:
+            case wkbPointIsoZ:
                 fprintf( fp, "\n");
                 break;
             case wkbLineString:
             case wkbLineString25D:
+            case wkbLineStringIsoZ:
                 poLine = (OGRLineString*)this;
                 fprintf( fp, "%d points\n", poLine->getNumPoints() );
                 break;
             case wkbPolygon:
             case wkbPolygon25D:
+            case wkbPolygonIsoZ:
             {
                 int ir;
                 int nRings;
@@ -165,12 +168,16 @@ void OGRGeometry::dumpReadable( FILE * fp, const char * pszPrefix, char** papszO
             }
             case wkbMultiPoint:
             case wkbMultiPoint25D:
+            case wkbMultiPointIsoZ:
             case wkbMultiLineString:
             case wkbMultiLineString25D:
+            case wkbMultiLineStringIsoZ:
             case wkbMultiPolygon:
             case wkbMultiPolygon25D:
+            case wkbMultiPolygonIsoZ:
             case wkbGeometryCollection:
             case wkbGeometryCollection25D:
+            case wkbGeometryCollectionIsoZ:
             {
                 int ig;
                 poColl = (OGRGeometryCollection*)this;

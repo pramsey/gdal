@@ -1448,7 +1448,7 @@ OGRErr OGRReadWKBGeometryType( unsigned char * pabyData, OGRwkbGeometryType *peG
     memcpy(&iRawType, pabyData + 1, 4);
     if ( OGR_SWAP(eByteOrder))
     {
-        CPL_SWAP32(iRawType);
+        CPL_SWAP32PTR(&iRawType);
     }
     
     /* Old-style OGC z-bit is flipped? */

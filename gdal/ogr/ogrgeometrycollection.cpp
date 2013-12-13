@@ -103,14 +103,20 @@ OGRGeometry *OGRGeometryCollection::clone() const
 /*                          getGeometryType()                           */
 /************************************************************************/
 
-OGRwkbGeometryType OGRGeometryCollection::getGeometryType() const
+OGRwkbGeometryType OGRGeometryCollection::getGeometryType(OGRwkbVariant eWkbVariant) const
 
 {
     if( getCoordinateDimension() == 3 )
-        return wkbGeometryCollection25D;
+    {
+        if ( eWkbVariant == wkbVariantIso )
+            return wkbGeometryCollectionIsoZ;
+        else
+            return wkbGeometryCollection25D;
+    }
     else
         return wkbGeometryCollection;
 }
+
 
 /************************************************************************/
 /*                            getDimension()                            */
@@ -543,7 +549,8 @@ OGRErr OGRGeometryCollection::importFromWkb( unsigned char * pabyData,
 /************************************************************************/
 
 OGRErr  OGRGeometryCollection::exportToWkb( OGRwkbByteOrder eByteOrder,
-                                            unsigned char * pabyData ) const
+                                            unsigned char * pabyData,
+                                            OGRwkbVariant eWkbVariant ) const
 
 {
     int         nOffset;
@@ -557,7 +564,7 @@ OGRErr  OGRGeometryCollection::exportToWkb( OGRwkbByteOrder eByteOrder,
 /*      Set the geometry feature type, ensuring that 3D flag is         */
 /*      preserved.                                                      */
 /* -------------------------------------------------------------------- */
-    GUInt32 nGType = getGeometryType();
+    GUInt32 nGType = getGeometryType(eWkbVariant);
     
     if( eByteOrder == wkbNDR )
         nGType = CPL_LSBWORD32( nGType );

@@ -103,14 +103,20 @@ void OGRPolygon::empty()
 /*                          getGeometryType()                           */
 /************************************************************************/
 
-OGRwkbGeometryType OGRPolygon::getGeometryType() const
+OGRwkbGeometryType OGRPolygon::getGeometryType(OGRwkbVariant eWkbVariant) const
 
 {
-    if( getCoordinateDimension() == 3 )
-        return wkbPolygon25D;
+    if( nCoordDimension == 3 )
+    {
+        if ( eWkbVariant == wkbVariantIso )
+            return wkbPolygonIsoZ;
+        else
+            return wkbPolygon25D;
+    }
     else
         return wkbPolygon;
 }
+
 
 /************************************************************************/
 /*                            getDimension()                            */
@@ -448,7 +454,8 @@ OGRErr OGRPolygon::importFromWkb( unsigned char * pabyData,
 /************************************************************************/
 
 OGRErr  OGRPolygon::exportToWkb( OGRwkbByteOrder eByteOrder,
-                                 unsigned char * pabyData ) const
+                                 unsigned char * pabyData,
+                                 OGRwkbVariant eWkbVariant ) const
 
 {
     int         nOffset;
@@ -462,7 +469,7 @@ OGRErr  OGRPolygon::exportToWkb( OGRwkbByteOrder eByteOrder,
 /* -------------------------------------------------------------------- */
 /*      Set the geometry feature type.                                  */
 /* -------------------------------------------------------------------- */
-    GUInt32 nGType = getGeometryType();
+    GUInt32 nGType = getGeometryType(eWkbVariant);
     
     if( eByteOrder == wkbNDR )
         nGType = CPL_LSBWORD32( nGType );

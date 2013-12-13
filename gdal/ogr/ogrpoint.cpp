@@ -126,13 +126,18 @@ int OGRPoint::getDimension() const
 /*                          getGeometryType()                           */
 /************************************************************************/
 
-OGRwkbGeometryType OGRPoint::getGeometryType() const
+OGRwkbGeometryType OGRPoint::getGeometryType(OGRwkbVariant eWkbVariant) const
 
 {
-    if( nCoordDimension < 3 )
-        return wkbPoint;
+    if( nCoordDimension == 3 )
+    {
+        if ( eWkbVariant == wkbVariantIso )
+            return wkbPointIsoZ;
+        else
+            return wkbPoint25D;
+    }
     else
-        return wkbPoint25D;
+        return wkbPoint;
 }
 
 /************************************************************************/
@@ -261,7 +266,8 @@ OGRErr OGRPoint::importFromWkb( unsigned char * pabyData,
 /************************************************************************/
 
 OGRErr  OGRPoint::exportToWkb( OGRwkbByteOrder eByteOrder,
-                               unsigned char * pabyData ) const
+                               unsigned char * pabyData,
+                               OGRwkbVariant eWkbVariant ) const
 
 {
 /* -------------------------------------------------------------------- */
@@ -272,7 +278,7 @@ OGRErr  OGRPoint::exportToWkb( OGRwkbByteOrder eByteOrder,
 /* -------------------------------------------------------------------- */
 /*      Set the geometry feature type.                                  */
 /* -------------------------------------------------------------------- */
-    GUInt32 nGType = getGeometryType();
+    GUInt32 nGType = getGeometryType(eWkbVariant);
     
     if( eByteOrder == wkbNDR )
         nGType = CPL_LSBWORD32( nGType );
