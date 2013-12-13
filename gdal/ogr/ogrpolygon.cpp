@@ -337,7 +337,7 @@ OGRErr OGRPolygon::importFromWkb( unsigned char * pabyData,
 
 {
     OGRwkbByteOrder     eByteOrder;
-    int                 nDataOffset, b3D;
+    int                 nDataOffset;
     
     if( nSize < 9 && nSize != -1 )
         return OGRERR_NOT_ENOUGH_DATA;
@@ -354,27 +354,19 @@ OGRErr OGRPolygon::importFromWkb( unsigned char * pabyData,
 /*      geometry type is between 0 and 255 so we only have to fetch     */
 /*      one byte.                                                       */
 /* -------------------------------------------------------------------- */
-#ifdef DEBUG
+
+    OGRBoolean b3D;
     OGRwkbGeometryType eGeometryType;
-    
-    if( eByteOrder == wkbNDR )
-        eGeometryType = (OGRwkbGeometryType) pabyData[1];
-    else
-        eGeometryType = (OGRwkbGeometryType) pabyData[4];
+    OGRErr err = OGRReadWKBGeometryType( pabyData, &eGeometryType, &b3D );
 
-    if( eGeometryType != wkbPolygon )
+    if( err != OGRERR_NONE || eGeometryType != wkbPolygon )
         return OGRERR_CORRUPT_DATA;
-#endif    
-
-    if( eByteOrder == wkbNDR )
-        b3D = pabyData[4] & 0x80 || pabyData[2] & 0x80;
-    else
-        b3D = pabyData[1] & 0x80 || pabyData[3] & 0x80;
 
     if( b3D )
         nCoordDimension = 3;
     else
         nCoordDimension = 2;
+
 
 /* -------------------------------------------------------------------- */
 /*      Do we already have some rings?                                  */

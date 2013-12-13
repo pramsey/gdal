@@ -399,18 +399,12 @@ OGRErr OGRGeometryCollection::importFromWkbInternal( unsigned char * pabyData,
 /*      geometry type is between 0 and 255 so we only have to fetch     */
 /*      one byte.                                                       */
 /* -------------------------------------------------------------------- */
+
+    OGRBoolean b3D;
     OGRwkbGeometryType eGeometryType;
+    OGRErr err = OGRReadWKBGeometryType( pabyData, &eGeometryType, &b3D );
 
-    if( eByteOrder == wkbNDR )
-    {
-        eGeometryType = (OGRwkbGeometryType) pabyData[1];
-    }
-    else
-    {
-        eGeometryType = (OGRwkbGeometryType) pabyData[4];
-    }
-
-    if ( eGeometryType != wkbFlatten(getGeometryType()) )
+    if ( err != OGRERR_NONE || eGeometryType != wkbFlatten(getGeometryType()) )
         return OGRERR_CORRUPT_DATA;
 
 /* -------------------------------------------------------------------- */
@@ -471,10 +465,9 @@ OGRErr OGRGeometryCollection::importFromWkbInternal( unsigned char * pabyData,
             return OGRERR_CORRUPT_DATA;
 
         OGRwkbGeometryType eSubGeomType;
-        if( eSubGeomByteOrder == wkbNDR )
-            eSubGeomType = (OGRwkbGeometryType) pabySubData[1];
-        else
-            eSubGeomType = (OGRwkbGeometryType) pabySubData[4];
+        OGRBoolean bIs3D;
+        if ( OGRReadWKBGeometryType( pabySubData, &eSubGeomType, &bIs3D ) != OGRERR_NONE )
+            return OGRERR_FAILURE;
 
         if( eSubGeomType == wkbPoint ||
             eSubGeomType == wkbLineString ||

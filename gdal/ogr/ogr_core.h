@@ -288,12 +288,12 @@ typedef int     OGRBoolean;
 /* -------------------------------------------------------------------- */
 /*      ogr_geometry.h related definitions.                             */
 /* -------------------------------------------------------------------- */
+
 /**
  * List of well known binary geometry types.  These are used within the BLOBs
  * but are also returned from OGRGeometry::getGeometryType() to identify the
  * type of a geometry object.
  */
-
 typedef enum 
 {
     wkbUnknown = 0,         /**< unknown type, non-standard */
@@ -316,8 +316,33 @@ typedef enum
     wkbMultiPoint25D = 0x80000004, /**< 2.5D extension as per 99-402 */
     wkbMultiLineString25D = 0x80000005, /**< 2.5D extension as per 99-402 */
     wkbMultiPolygon25D = 0x80000006, /**< 2.5D extension as per 99-402 */
-    wkbGeometryCollection25D = 0x80000007 /**< 2.5D extension as per 99-402 */
+    wkbGeometryCollection25D = 0x80000007, /**< 2.5D extension as per 99-402 */
+    
+    wkbPointIsoZ = 1001, /**< ISO SQL/MM Part 3 PointZ type */
+    wkbLineStringIsoZ = 1002, /**< ISO SQL/MM Part 3 LineStringZ type */
+    wkbPolygonIsoZ = 1003, /**< ISO SQL/MM Part 3 PolygonZ type */
+    wkbMultiPointIsoZ = 1004, /**< ISO SQL/MM Part 3 MultiPointZ type */
+    wkbMultiLineStringIsoZ = 1005, /**< ISO SQL/MM Part 3 MultiLineStringZ type */
+    wkbMultiPolygonIsoZ = 1006, /**< ISO SQL/MM Part 3 MultiPolygonZ type */
+    wkbGeometryCollectionIsoZ = 1007 /**< ISO SQL/MM Part 3 GeometryCollectionZ type */
+    
 } OGRwkbGeometryType;
+
+
+/**
+ * Output variants of WKB we support. 
+ * 99-402 was a short-lived extension to SFSQL 1.1 that used a high-bit flag
+ * to indicate the presence of Z coordiantes in a WKB geometry.
+ * SQL/MM Part 3 and SFSQL 1.2 use offsets of 1000 (Z), 2000 (M) and 3000 (ZM)
+ * to indicate the present of higher dimensional coordinates in a WKB geometry.
+ */
+typedef enum 
+{
+    wkbVariantOgc, /**< Old-style 99-402 extended dimension (Z) WKB types */
+    wkbVariantIso  /**< SFSQL 1.2 and ISO SQL/MM Part 3 extended dimension (Z&M) WKB types */
+} OGRwkbVariant;
+
+
 
 #define wkb25DBit 0x80000000
 #define wkbFlatten(x)  ((OGRwkbGeometryType) ((x) & (~wkb25DBit)))

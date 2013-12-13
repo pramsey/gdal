@@ -828,22 +828,13 @@ OGRErr OGRLineString::importFromWkb( unsigned char * pabyData,
 /*      geometry type is between 0 and 255 so we only have to fetch     */
 /*      one byte.                                                       */
 /* -------------------------------------------------------------------- */
+    OGRBoolean bIs3D;
     OGRwkbGeometryType eGeometryType;
-    int bIs3D = FALSE;
+    OGRErr err = OGRReadWKBGeometryType( pabyData, &eGeometryType, &bIs3D );
 
-    if( eByteOrder == wkbNDR )
-    {
-        eGeometryType = (OGRwkbGeometryType) pabyData[1];
-        bIs3D = pabyData[4] & 0x80 || pabyData[2] & 0x80;
-    }
-    else
-    {
-        eGeometryType = (OGRwkbGeometryType) pabyData[4];
-        bIs3D = pabyData[1] & 0x80 || pabyData[3] & 0x80;
-    }
-
-    if( eGeometryType != wkbLineString )
+    if( err != OGRERR_NONE || eGeometryType != wkbLineString )
         return OGRERR_CORRUPT_DATA;
+
 
 /* -------------------------------------------------------------------- */
 /*      Get the vertex count.                                           */
