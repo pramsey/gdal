@@ -58,5 +58,8 @@ const char*         GPkgFieldFromOGR(OGRFieldType nType);
 OGRwkbGeometryType  GPkgGeometryTypeToWKB(const char *pszGpkgType, int bHasZ);
 const char*         GPkgGeometryTypeFromWKB(OGRwkbGeometryType oType);
 
+GByte*              GPkgGeometryFromOGR(const OGRGeometry *poGeometry);
+OGRGeometry*        GPkgGeometryToOGR(GByte *pabyGpkg, size_t szGpkg, OGRSpatialReference *poSrs);
+OGRErr              GPkgEnvelopeToOGR(GByte *pabyGpkg, size_t szGpkg, OGREnvelope *poEnv);
 
 #endif

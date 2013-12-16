@@ -29,7 +29,7 @@
  
  
 #include "ogrgeopackageutility.h"
-
+#include "ogr_p.h"
 
 /* Runs a SQL command and ignores the result (good for INSERT/UPDATE/CREATE) */
 OGRErr SQLCommand(sqlite3 * poDb, const char * pszSQL)
@@ -306,6 +306,8 @@ const char* GPkgFieldFromOGR(OGRFieldType nType)
 *  BLOBs using the Standard GeoPackageBinary format specified in table GeoPackage 
 *  SQL Geometry Binary Format and clause Geometry Encoding.
 *
+*  http://opengis.github.io/geopackage/#gpb_format
+*
 *   GeoPackageBinaryHeader {
 *     byte[2] magic = 0x4750; 
 *     byte version;           
@@ -318,8 +320,262 @@ const char* GPkgFieldFromOGR(OGRFieldType nType)
 *     GeoPackageBinaryHeader header; 
 *     WKBGeometry geometry;          
 *   }
+*
+*  Flags byte contents:
+*  Bit 7: Reserved for future
+*  Bit 6: Reserved for future
+*  Bit 5: Using Extended GPKG Binary?
+*  Bit 4: Geometry is Empty?
+*  Bit 3,2,1: Envelope contents (0 none, 1=X/Y, 2=X/Y/Z, 3=X/Y/M, 4=X/Y/Z/M)
+*  Bit 0: Byte order of header (0=big/XDR, 1=little/NDR)
+*
 */
 
-// OGRGeometry->IsEmpty() for empty test
+GByte* GPkgGeometryFromOGR(const OGRGeometry *poGeometry, int iSrsId)
+{
+    CPLAssert( poGeometry != NULL );
+    
+    GByte *pabyPtr;
+    GByte byFlags = 0;
+    GByte byEnv = 1;
+    OGRwkbByteOrder eByteOrder = (OGRwkbByteOrder)CPL_IS_LSB;
+    OGRErr err;
+    OGRBoolean bPoint = (wkbFlatten(poGeometry->getGeometryType()) == wkbPoint);
+    OGRBoolean bEmpty = poGeometry->IsEmpty();
+    int iDims = poGeometry->getCoordinateDimension();
+
+    /* Header has 8 bytes for sure, and optional extra space for bounds */
+    size_t szHeader = 2+1+1+4;    
+    if ( ! bPoint && ! bEmpty )
+    {
+        szHeader += 8*2*iDims;
+    }
+    
+    /* Total BLOB size is header + WKB size */
+    size_t szWkb = szHeader + poGeometry->WkbSize();
+    GByte *pabyWkb = (GByte *)CPLMalloc(szWkb);
+    
+    /* Header Magic */
+    pabyWkb[0] = 0x47;
+    pabyWkb[1] = 0x50;
+
+    /* GPKG BLOB Version */
+    pabyWkb[2] = 0;
+    
+    /* Extended? No. */
+
+    /* Envelope dimensionality? */
+
+    /* Don't write envelope for point type */
+    if ( bPoint )
+        byEnv = 0; 
+    else
+        /* 3D envelope for 3D data */      
+        if ( iDims == 3 )
+            byEnv = 2;
+        /* 2D envelope otherwise */      
+        else
+            byEnv = 1;
+
+    
+    
+    /* Empty? No envelope then. */
+    if ( bEmpty )
+    {
+        byEnv = 0;
+        /* Set empty flag */
+        byFlags |= (1 << 4);
+    }
+    
+    
+    /* Set envelope flags */
+    byFlags |= (byEnv << 1);
+
+    /* Byte order of header? */
+    /* Use native endianness */
+    byFlags |= eByteOrder;
+
+    /* Write flags byte */
+    pabyWkb[3] = byFlags;
+    
+    /* Write srs_id */
+    memcpy(pabyWkb+4, &iSrsId, 4);
+    
+    /* Write envelope */
+    if ( ! bEmpty && ! bPoint )
+    {
+        double *padPtr = (double*)(pabyWkb+8);
+        if ( iDims == 3 )
+        {
+            OGREnvelope3D oEnv3d;
+            poGeometry->getEnvelope(&oEnv3d);
+            padPtr[0] = oEnv3d.MinX;
+            padPtr[1] = oEnv3d.MaxX;
+            padPtr[2] = oEnv3d.MinY;
+            padPtr[3] = oEnv3d.MaxY;
+            padPtr[4] = oEnv3d.MinZ;
+            padPtr[5] = oEnv3d.MaxZ;
+        }
+        else
+        {
+            OGREnvelope oEnv;
+            poGeometry->getEnvelope(&oEnv);
+            padPtr[0] = oEnv.MinX;
+            padPtr[1] = oEnv.MaxX;
+            padPtr[2] = oEnv.MinY;
+            padPtr[3] = oEnv.MaxY;
+        }
+    }
+    
+    pabyPtr = pabyWkb + szHeader;
+    
+    /* TODO add in WKB variant option for ISO SQL/MM */
+    err = poGeometry->exportToWkb(eByteOrder, pabyPtr);
+    if ( err != OGRERR_NONE )
+    {
+        CPLFree(pabyWkb);
+        return NULL;
+    }
+    
+    return pabyWkb;    
+}
+
+typedef struct 
+{
+    OGRBoolean bEmpty;
+    OGRBoolean bExtended;
+    OGRwkbByteOrder eByteOrder;
+    int iSrsId;
+    int iDims;
+    double MinX, MaxX, MinY, MaxY, MinZ, MaxZ;
+    size_t szHeader;
+} GPkgHeader;
 
 
+static OGRErr GPkgHeaderFromWKB(const GByte *pabyGpkg, GPkgHeader *poHeader)
+{
+    CPLAssert( pabyGpkg != NULL );
+    CPLAssert( poHeader != NULL );
+
+    /* Magic (match required) */
+    if ( pabyGpkg[0] != 0x47 || 
+         pabyGpkg[1] != 0x50 ||
+         pabyGpkg[2] != 0 )  /* Version (only 0 supported at this time)*/
+    {
+        return OGRERR_FAILURE;
+    }
+
+    /* Flags */
+    GByte byFlags = pabyGpkg[3];
+    poHeader->bEmpty = byFlags & (0x01 << 4);
+    poHeader->bExtended = byFlags & (0x01 << 5);
+    poHeader->eByteOrder = (OGRwkbByteOrder)(byFlags & 0x01);
+    OGRBoolean bSwap = OGR_SWAP(poHeader->eByteOrder);
+
+    /* Envelope */
+    int iEnvelope = byFlags & (0x07 << 1);
+    if ( iEnvelope == 1 )
+        poHeader->iDims = 2; /* 2D envelope */
+    else if ( iEnvelope == 2 )
+        poHeader->iDims = 3; /* 3D envelope */
+    else 
+        poHeader->iDims = 0; /* No envelope */
+
+    /* SrsId */
+    int iSrsId;
+    memcpy(&iSrsId, pabyGpkg+4, 4);    
+    if ( bSwap )
+    {
+        iSrsId = CPL_SWAP32(iSrsId);
+    }
+    poHeader->iSrsId = iSrsId;
+    
+    /* Envelope */
+    double *padPtr = (double*)(pabyGpkg+8);
+    if ( poHeader->iDims == 2 )
+    {
+        poHeader->MinX = padPtr[0];
+        poHeader->MaxX = padPtr[1];
+        poHeader->MinY = padPtr[2];
+        poHeader->MaxY = padPtr[3];
+        if ( bSwap )
+        {
+            CPL_SWAPDOUBLE(&(poHeader->MinX));
+            CPL_SWAPDOUBLE(&(poHeader->MaxX));
+            CPL_SWAPDOUBLE(&(poHeader->MinY));
+            CPL_SWAPDOUBLE(&(poHeader->MaxY));
+        }
+    }
+    if ( poHeader->iDims == 3 )
+    {
+        poHeader->MinZ = padPtr[4];
+        poHeader->MaxZ = padPtr[5];
+        if ( bSwap )
+        {
+            CPL_SWAPDOUBLE(&(poHeader->MinZ));
+            CPL_SWAPDOUBLE(&(poHeader->MaxZ));
+        }
+    }
+    
+    /* Header size in byte stream */
+    poHeader->szHeader = 8 + 8*2*(poHeader->iDims);
+    
+    return OGRERR_NONE;
+}
+
+OGRGeometry* GPkgGeometryToOGR(GByte *pabyGpkg, size_t szGpkg, OGRSpatialReference *poSrs)
+{
+    CPLAssert( poSrs != NULL );
+    CPLAssert( pabyGpkg != NULL );
+    
+    GPkgHeader oHeader;
+    OGRGeometry *poGeom;
+    
+    /* Read header */
+    OGRErr err = GPkgHeaderFromWKB(pabyGpkg, &oHeader);
+    if ( err != OGRERR_NONE )
+        return NULL;
+
+    /* WKB pointer */
+    GByte *pabyWkb = pabyGpkg + oHeader.szHeader;
+    size_t szWkb = szGpkg - oHeader.szHeader;
+
+    /* Parse WKB */
+    err = OGRGeometryFactory::createFromWkb(pabyWkb, poSrs, &poGeom, szWkb);
+    if ( err != OGRERR_NONE )
+        return NULL;
+
+    return poGeom;
+}
+
+
+OGRErr GPkgEnvelopeToOGR(GByte *pabyGpkg, size_t szGpkg, OGREnvelope *poEnv)
+{
+    CPLAssert( poEnv != NULL );
+    CPLAssert( pabyGpkg != NULL );
+    
+    GPkgHeader oHeader;
+
+    /* Read header */
+    OGRErr err = GPkgHeaderFromWKB(pabyGpkg, &oHeader);
+    if ( err != OGRERR_NONE )
+        return err;
+
+    if ( oHeader.bEmpty || oHeader.iDims == 0 )
+    {
+        return OGRERR_FAILURE;
+    }
+    
+    poEnv->MinX = oHeader.MinX;
+    poEnv->MaxX = oHeader.MaxX;
+    poEnv->MinY = oHeader.MinY;
+    poEnv->MaxY = oHeader.MaxY;
+    
+    // if ( oHeader.iDims == 3 )
+    // {
+    //     poEnv->MinZ = oHeader.MinZ;
+    //     poEnv->MaxZ = oHeader.MaxZ;
+    // }
+    
+    return OGRERR_NONE;
+}
