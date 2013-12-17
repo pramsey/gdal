@@ -195,7 +195,7 @@ def ogr_gpkg_6():
     field_defn = ogr.FieldDefn('dummy', ogr.OFTString)
     ret = lyr.CreateField(field_defn)
 
-    if lyr.GetLayerDefn().GetFieldDefn(1).GetType() != ogr.OFTString:
+    if lyr.GetLayerDefn().GetFieldDefn(0).GetType() != ogr.OFTString:
         gdaltest.post_reason( 'wrong field type' )
         return 'fail'
     
@@ -215,7 +215,7 @@ def ogr_gpkg_6():
     if lyr.GetName() != 'field_test_layer':
         return 'fail'
         
-    field_defn_out = lyr.GetLayerDefn().GetFieldDefn(1)
+    field_defn_out = lyr.GetLayerDefn().GetFieldDefn(0)
     if field_defn_out.GetType() != ogr.OFTString:
         gdaltest.post_reason( 'wrong field type after reopen' )
         return 'fail'
@@ -224,6 +224,23 @@ def ogr_gpkg_6():
         gdaltest.post_reason( 'wrong field name after reopen' )
         return 'fail'
     
+    return 'success'
+
+
+###############################################################################
+# Add a feature 
+
+def ogr_gpkg_7():
+
+    lyr = gdaltest.gpkg_ds.GetLayerByName('field_test_layer')
+    geom = ogr.CreateGeometryFromWkt('POINT(10 10)')
+    feat = ogr.Feature(lyr.GetLayerDefn())
+    feat.SetGeometry(geom)
+    feat.SetField('dummy', 'a dummy value')
+    if lyr.CreateFeature(feat) != 0:
+        gdaltest.post_reason('cannot create feature')
+        return 'fail'
+
     return 'success'
 
 
@@ -237,6 +254,7 @@ gdaltest_list = [
     ogr_gpkg_4,
     ogr_gpkg_5,
     ogr_gpkg_6,
+    ogr_gpkg_7,
 ]
 
 if __name__ == '__main__':

@@ -128,6 +128,27 @@ char* SQLResultGetValue(const SQLResult * poResult, int iColNum, int iRowNum)
     return poResult->papszResult[ nCols + iRowNum * nCols + iColNum ];
 }
 
+int SQLResultGetValueAsInteger(const SQLResult * poResult, int iColNum, int iRowNum)
+{
+    int nCols = poResult->nColCount;
+    int nRows = poResult->nRowCount;
+    
+    if ( ! poResult ) 
+        return 0;
+        
+    if ( iColNum < 0 || iColNum >= nCols )
+        return 0;
+
+    if ( iRowNum < 0 || iRowNum >= nRows )
+        return 0;
+    
+    char *pszValue = poResult->papszResult[ nCols + iRowNum * nCols + iColNum ];
+    if ( ! pszValue )
+        return 0;
+
+    return atoi(pszValue);
+}
+
 /* Returns the first row of first column of SQL as integer */
 int SQLGetInteger(sqlite3 * poDb, const char * pszSQL, OGRErr *err)
 {
@@ -301,6 +322,31 @@ const char* GPkgFieldFromOGR(OGRFieldType nType)
     }
 }
 
+
+int SQLiteFieldFromOGR(OGRFieldType nType)
+{
+    switch(nType)
+    {
+        case OFTInteger:
+            return SQLITE_INTEGER;
+        case OFTReal:
+            return SQLITE_FLOAT;
+        case OFTString:
+            return SQLITE_TEXT;
+        case OFTBinary:
+            return SQLITE_BLOB;
+        case OFTDate:
+            return SQLITE_TEXT;
+        case OFTDateTime:
+            return SQLITE_TEXT;
+        default:
+            return 0;
+    }
+}
+
+
+
+
 /* Requirement 19: A GeoPackage SHALL store feature table geometries 
 *  with or without optional elevation (Z) and/or measure (M) values in SQL 
 *  BLOBs using the Standard GeoPackageBinary format specified in table GeoPackage 
@@ -331,7 +377,7 @@ const char* GPkgFieldFromOGR(OGRFieldType nType)
 *
 */
 
-GByte* GPkgGeometryFromOGR(const OGRGeometry *poGeometry, int iSrsId)
+GByte* GPkgGeometryFromOGR(const OGRGeometry *poGeometry, int iSrsId, size_t *szWkb)
 {
     CPLAssert( poGeometry != NULL );
     
@@ -352,8 +398,9 @@ GByte* GPkgGeometryFromOGR(const OGRGeometry *poGeometry, int iSrsId)
     }
     
     /* Total BLOB size is header + WKB size */
-    size_t szWkb = szHeader + poGeometry->WkbSize();
-    GByte *pabyWkb = (GByte *)CPLMalloc(szWkb);
+    if (szWkb)
+        *szWkb = szHeader + poGeometry->WkbSize();
+    GByte *pabyWkb = (GByte *)CPLMalloc(*szWkb);
     
     /* Header Magic */
     pabyWkb[0] = 0x47;
@@ -376,8 +423,6 @@ GByte* GPkgGeometryFromOGR(const OGRGeometry *poGeometry, int iSrsId)
         /* 2D envelope otherwise */      
         else
             byEnv = 1;
-
-    
     
     /* Empty? No envelope then. */
     if ( bEmpty )
@@ -386,7 +431,6 @@ GByte* GPkgGeometryFromOGR(const OGRGeometry *poGeometry, int iSrsId)
         /* Set empty flag */
         byFlags |= (1 << 4);
     }
-    
     
     /* Set envelope flags */
     byFlags |= (byEnv << 1);

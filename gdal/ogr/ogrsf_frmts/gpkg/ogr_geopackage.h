@@ -94,8 +94,9 @@ class OGRGeoPackageDataSource : public OGRDataSource
                                          OGRSpatialReference * poSpatialRef,
                                          OGRwkbGeometryType eGType,
                                          char **papszOptions );
-    
         int                 TestCapability( const char * );
+        
+        virtual int         IsReadOnly() { return m_bUpdate; }
         int                 GetSrsId( const OGRSpatialReference * poSRS );
         OGRSpatialReference* GetSpatialRef( int iSrsId );
         sqlite3*            GetDatabaseHandle();
@@ -141,6 +142,8 @@ class OGRGeoPackageDataSource : public OGRDataSource
 class OGRGeoPackageLayer : public OGRLayer
 {
     char*                       m_pszTableName;
+    char*                       m_pszFidColumn;
+    int                         m_iSrs;
     OGRGeoPackageDataSource*    m_poDS;
     OGREnvelope*                m_poExtent;
     OGRFeatureDefn*             m_poFeatureDefn;
