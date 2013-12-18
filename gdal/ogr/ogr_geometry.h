@@ -80,8 +80,11 @@ class CPL_DLL OGRGeometry
   private:
     OGRSpatialReference * poSRS;                // may be NULL
 
+
   protected:
     int                   nCoordDimension;
+
+    int getIsoGeometryType() const;
     
   public:
                 OGRGeometry();
@@ -107,7 +110,7 @@ class CPL_DLL OGRGeometry
     virtual OGRErr exportToWkt( char ** ppszDstText ) const = 0;
     
     // non-standard
-    virtual OGRwkbGeometryType getGeometryType(OGRwkbVariant=wkbVariantOgc) const = 0;
+    virtual OGRwkbGeometryType getGeometryType() const = 0;
     virtual const char *getGeometryName() const = 0;
     virtual void   dumpReadable( FILE *, const char * = NULL, char** papszOptions = NULL ) const;
     virtual void   flattenTo2D() = 0;
@@ -222,7 +225,7 @@ class CPL_DLL OGRPoint : public OGRGeometry
     
     // Non standard from OGRGeometry
     virtual const char *getGeometryName() const;
-    virtual OGRwkbGeometryType getGeometryType(OGRwkbVariant=wkbVariantOgc) const;
+    virtual OGRwkbGeometryType getGeometryType() const;
     virtual OGRErr  transform( OGRCoordinateTransformation *poCT );
     virtual void flattenTo2D();
 
@@ -327,7 +330,7 @@ class CPL_DLL OGRLineString : public OGRCurve
     void        reversePoints( void );
 
     // non-standard from OGRGeometry
-    virtual OGRwkbGeometryType getGeometryType(OGRwkbVariant=wkbVariantOgc) const;
+    virtual OGRwkbGeometryType getGeometryType() const;
     virtual const char *getGeometryName() const;
     virtual OGRErr  transform( OGRCoordinateTransformation *poCT );
     virtual void flattenTo2D();
@@ -432,7 +435,7 @@ class CPL_DLL OGRPolygon : public OGRSurface
 
     // Non standard (OGRGeometry).
     virtual const char *getGeometryName() const;
-    virtual OGRwkbGeometryType getGeometryType(OGRwkbVariant=wkbVariantOgc) const;
+    virtual OGRwkbGeometryType getGeometryType() const;
     virtual OGRGeometry *clone() const;
     virtual void empty();
     virtual OGRErr  transform( OGRCoordinateTransformation *poCT );
@@ -503,7 +506,7 @@ class CPL_DLL OGRGeometryCollection : public OGRGeometry
 
     // Non standard (OGRGeometry).
     virtual const char *getGeometryName() const;
-    virtual OGRwkbGeometryType getGeometryType(OGRwkbVariant=wkbVariantOgc) const;
+    virtual OGRwkbGeometryType getGeometryType() const;
     virtual OGRGeometry *clone() const;
     virtual void empty();
     virtual OGRErr  transform( OGRCoordinateTransformation *poCT );
@@ -562,7 +565,7 @@ class CPL_DLL OGRMultiPolygon : public OGRGeometryCollection
             OGRMultiPolygon();
     // Non standard (OGRGeometry).
     virtual const char *getGeometryName() const;
-    virtual OGRwkbGeometryType getGeometryType(OGRwkbVariant=wkbVariantOgc) const;
+    virtual OGRwkbGeometryType getGeometryType() const;
     virtual OGRGeometry *clone() const;
     virtual OGRErr importFromWkt( char ** );
     virtual OGRErr exportToWkt( char ** ) const;
@@ -593,7 +596,7 @@ class CPL_DLL OGRMultiPoint : public OGRGeometryCollection
             OGRMultiPoint();
     // Non standard (OGRGeometry).
     virtual const char *getGeometryName() const;
-    virtual OGRwkbGeometryType getGeometryType(OGRwkbVariant=wkbVariantOgc) const;
+    virtual OGRwkbGeometryType getGeometryType() const;
     virtual OGRGeometry *clone() const;
     virtual OGRErr importFromWkt( char ** );
     virtual OGRErr exportToWkt( char ** ) const;
@@ -620,7 +623,7 @@ class CPL_DLL OGRMultiLineString : public OGRGeometryCollection
             ~OGRMultiLineString();
     // Non standard (OGRGeometry).
     virtual const char *getGeometryName() const;
-    virtual OGRwkbGeometryType getGeometryType(OGRwkbVariant=wkbVariantOgc) const;
+    virtual OGRwkbGeometryType getGeometryType() const;
     virtual OGRGeometry *clone() const;
     virtual OGRErr importFromWkt( char ** );
     virtual OGRErr exportToWkt( char ** ) const;

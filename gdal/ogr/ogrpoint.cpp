@@ -126,16 +126,11 @@ int OGRPoint::getDimension() const
 /*                          getGeometryType()                           */
 /************************************************************************/
 
-OGRwkbGeometryType OGRPoint::getGeometryType(OGRwkbVariant eWkbVariant) const
+OGRwkbGeometryType OGRPoint::getGeometryType() const
 
 {
     if( nCoordDimension == 3 )
-    {
-        if ( eWkbVariant == wkbVariantIso )
-            return wkbPointIsoZ;
-        else
-            return wkbPoint25D;
-    }
+        return wkbPoint25D;
     else
         return wkbPoint;
 }
@@ -278,7 +273,10 @@ OGRErr  OGRPoint::exportToWkb( OGRwkbByteOrder eByteOrder,
 /* -------------------------------------------------------------------- */
 /*      Set the geometry feature type.                                  */
 /* -------------------------------------------------------------------- */
-    GUInt32 nGType = getGeometryType(eWkbVariant);
+    GUInt32 nGType = getGeometryType();
+    
+    if ( eWkbVariant == wkbVariantIso )
+        nGType = getIsoGeometryType();
     
     if( eByteOrder == wkbNDR )
         nGType = CPL_LSBWORD32( nGType );

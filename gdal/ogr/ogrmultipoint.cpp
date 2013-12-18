@@ -45,16 +45,11 @@ OGRMultiPoint::OGRMultiPoint()
 /*                          getGeometryType()                           */
 /************************************************************************/
 
-OGRwkbGeometryType OGRMultiPoint::getGeometryType(OGRwkbVariant eWkbVariant) const
+OGRwkbGeometryType OGRMultiPoint::getGeometryType() const
 
 {
     if( getCoordinateDimension() == 3 )
-    {
-        if ( eWkbVariant == wkbVariantIso )
-            return wkbMultiPointIsoZ;
-        else
-            return wkbMultiPoint25D;
-    }
+        return wkbMultiPoint25D;
     else
         return wkbMultiPoint;
 }

@@ -103,16 +103,11 @@ OGRGeometry *OGRGeometryCollection::clone() const
 /*                          getGeometryType()                           */
 /************************************************************************/
 
-OGRwkbGeometryType OGRGeometryCollection::getGeometryType(OGRwkbVariant eWkbVariant) const
+OGRwkbGeometryType OGRGeometryCollection::getGeometryType() const
 
 {
     if( getCoordinateDimension() == 3 )
-    {
-        if ( eWkbVariant == wkbVariantIso )
-            return wkbGeometryCollectionIsoZ;
-        else
-            return wkbGeometryCollection25D;
-    }
+        return wkbGeometryCollection25D;
     else
         return wkbGeometryCollection;
 }
@@ -564,7 +559,10 @@ OGRErr  OGRGeometryCollection::exportToWkb( OGRwkbByteOrder eByteOrder,
 /*      Set the geometry feature type, ensuring that 3D flag is         */
 /*      preserved.                                                      */
 /* -------------------------------------------------------------------- */
-    GUInt32 nGType = getGeometryType(eWkbVariant);
+    GUInt32 nGType = getGeometryType();
+    
+    if ( eWkbVariant == wkbVariantIso )
+        nGType = getIsoGeometryType();
     
     if( eByteOrder == wkbNDR )
         nGType = CPL_LSBWORD32( nGType );

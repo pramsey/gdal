@@ -52,16 +52,11 @@ OGRMultiLineString::~OGRMultiLineString()
 /*                          getGeometryType()                           */
 /************************************************************************/
 
-OGRwkbGeometryType OGRMultiLineString::getGeometryType(OGRwkbVariant eWkbVariant) const
+OGRwkbGeometryType OGRMultiLineString::getGeometryType() const
 
 {
     if( getCoordinateDimension() == 3 )
-    {
-        if ( eWkbVariant == wkbVariantIso )
-            return wkbMultiLineStringIsoZ;
-        else
-            return wkbMultiLineString25D;
-    }
+        return wkbMultiLineString25D;
     else
         return wkbMultiLineString;
 }
