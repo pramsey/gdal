@@ -31,35 +31,6 @@
 #include "ogrgeopackageutility.h"
 
 
-OGRErr OGRGeoPackageLayer::BuildColumns()
-{
-    if ( ! m_poFeatureDefn )
-    {
-        return OGRERR_FAILURE;
-    }
-
-    /* Always have a primary key */
-    CPLString soColumns = "";
-    soColumns += m_pszFidColumn;
-
-    /* Add a geometry column if there is one (just one) */
-    if ( m_poFeatureDefn->GetGeomFieldCount() )
-    {
-        soColumns += ", ";
-        soColumns += m_poFeatureDefn->GetGeomFieldDefn(0)->GetNameRef();
-    }
-
-    /* Add all the attribute columns */
-    for( int i = 0; i < m_poFeatureDefn->GetFieldCount(); i++ )
-    {
-        soColumns += ", ";
-        soColumns += m_poFeatureDefn->GetFieldDefn(i)->GetNameRef();
-    }
-
-    m_soColumns = soColumns;    
-    return OGRERR_NONE;    
-}
-
 OGRErr OGRGeoPackageLayer::SaveExtent()
 {
     if ( ! m_bExtentChanged || ! m_poExtent ) 
@@ -97,6 +68,33 @@ OGRErr OGRGeoPackageLayer::UpdateExtent( const OGREnvelope *poExtent )
     return OGRERR_NONE;
 }
 
+OGRErr OGRGeoPackageLayer::BuildColumns()
+{
+    if ( ! m_poFeatureDefn || ! m_pszFidColumn )
+    {
+        return OGRERR_FAILURE;
+    }
+
+    /* Always start with a primary key */
+    CPLString soColumns = m_pszFidColumn;
+
+    /* Add a geometry column if there is one (just one) */
+    if ( m_poFeatureDefn->GetGeomFieldCount() )
+    {
+        soColumns += ", ";
+        soColumns += m_poFeatureDefn->GetGeomFieldDefn(0)->GetNameRef();
+    }
+
+    /* Add all the attribute columns */
+    for( int i = 0; i < m_poFeatureDefn->GetFieldCount(); i++ )
+    {
+        soColumns += ", ";
+        soColumns += m_poFeatureDefn->GetFieldDefn(i)->GetNameRef();
+    }
+
+    m_soColumns = soColumns;    
+    return OGRERR_NONE;    
+}
 
 OGRErr OGRGeoPackageLayer::ReadFeature( sqlite3_stmt *poQuery, OGRFeature **ppoFeature )
 {
@@ -190,6 +188,21 @@ OGRErr OGRGeoPackageLayer::ReadTableDefinition()
                 
     err = SQLQuery(poDb, pszSQL, &oResultContents);
     sqlite3_free(pszSQL);
+    
+    char *pszMinX = SQLResultGetValue(&oResultContents, 5, 0);
+    char *pszMinY = SQLResultGetValue(&oResultContents, 6, 0);
+    char *pszMaxX = SQLResultGetValue(&oResultContents, 7, 0);
+    char *pszMaxY = SQLResultGetValue(&oResultContents, 8, 0);
+    
+	/* All the extrema have to be non-NULL for this to make sense */
+    OGREnvelope oExtent;
+    if ( pszMinX && pszMinY && pszMaxX && pszMaxY )
+    {
+        oExtent.MinX = atof(pszMinX);
+        oExtent.MinY = atof(pszMinY);
+        oExtent.MaxX = atof(pszMaxX);
+        oExtent.MaxY = atof(pszMaxY);
+    }
 
     /* gpkg_contents query has to work */
     /* gpkg_contents.table_name is supposed to be unique */
@@ -199,6 +212,9 @@ OGRErr OGRGeoPackageLayer::ReadTableDefinition()
         SQLResultFree(&oResultContents);
         return err;        
     }
+
+    /* Done with info from gpkg_contents now */
+    SQLResultFree(&oResultContents);
 
     /* Check that the table name is registered in gpkg_geometry_columns */
     pszSQL = sqlite3_mprintf(
@@ -216,7 +232,6 @@ OGRErr OGRGeoPackageLayer::ReadTableDefinition()
     if ( err != OGRERR_NONE || oResultGeomCols.nRowCount != 1 )
     {
         CPLError( CE_Failure, CPLE_AppDefined, "%s", oResultGeomCols.pszErrMsg );
-        SQLResultFree(&oResultContents);
         SQLResultFree(&oResultGeomCols);
         return err;
     }
@@ -232,7 +247,6 @@ OGRErr OGRGeoPackageLayer::ReadTableDefinition()
     if ( err != OGRERR_NONE || oResultTable.nRowCount == 0 )
     {
         CPLError( CE_Failure, CPLE_AppDefined, "%s", oResultTable.pszErrMsg );
-        SQLResultFree(&oResultContents);
         SQLResultFree(&oResultGeomCols);
         SQLResultFree(&oResultTable);
         return err;
@@ -246,12 +260,14 @@ OGRErr OGRGeoPackageLayer::ReadTableDefinition()
     int iSrsId = SQLResultGetValueAsInteger(&oResultGeomCols, 3, 0);
     char *pszGeomColsType = SQLResultGetValue(&oResultGeomCols, 2, 0);
     int iRecord;
+    OGRBoolean bFidFound = FALSE;
     m_iSrs = iSrsId;
+    
     for ( iRecord = 0; iRecord < oResultTable.nRowCount; iRecord++ )
     {
         char *pszName = SQLResultGetValue(&oResultTable, 1, iRecord);
         char *pszType = SQLResultGetValue(&oResultTable, 2, iRecord);
-        int bFid = SQLResultGetValueAsInteger(&oResultTable, 5, iRecord);
+        OGRBoolean bFid = SQLResultGetValueAsInteger(&oResultTable, 5, iRecord);
         OGRFieldType oType = GPkgFieldToOGR(pszType);
 
         /* Not a standard field type... */
@@ -266,10 +282,10 @@ OGRErr OGRGeoPackageLayer::ReadTableDefinition()
                 if ( oGeomType != oGeomTypeGeomCols )
                 {
                     CPLError(CE_Failure, CPLE_AppDefined, 
-                             "geometry column type in table and gpkg_geometry_columns is inconsistent");
-                    SQLResultFree(&oResultContents);
-                    SQLResultFree(&oResultGeomCols);
+                             "geometry column type in '%s.%s' is not consistent with type in gpkg_geometry_columns", 
+                             m_pszTableName, pszName);
                     SQLResultFree(&oResultTable);
+                    SQLResultFree(&oResultGeomCols);
                     return OGRERR_FAILURE;
                 }
                 
@@ -286,7 +302,10 @@ OGRErr OGRGeoPackageLayer::ReadTableDefinition()
                 else
                 {
                     CPLError(CE_Failure, CPLE_AppDefined, 
-                             "feature definition already has mutliple geometry fields?!?");
+                             "table '%s' has geometry fields? not legal in gpkg", 
+                             m_pszTableName);
+                    SQLResultFree(&oResultTable);
+                    SQLResultFree(&oResultGeomCols);
                     return OGRERR_FAILURE;
                 }
 
@@ -311,6 +330,7 @@ OGRErr OGRGeoPackageLayer::ReadTableDefinition()
             /* Is this the FID column? */
             if ( bFid )
             {
+                bFidFound = TRUE;
                 m_pszFidColumn = CPLStrdup(pszName);
             }
             else
@@ -321,24 +341,20 @@ OGRErr OGRGeoPackageLayer::ReadTableDefinition()
         }
     }
 
-    char *pszMinX = SQLResultGetValue(&oResultContents, 5, 0);
-    char *pszMinY = SQLResultGetValue(&oResultContents, 6, 0);
-    char *pszMaxX = SQLResultGetValue(&oResultContents, 7, 0);
-    char *pszMaxY = SQLResultGetValue(&oResultContents, 8, 0);
-    
-	/* All the extrema have to be non-NULL for this to make sense */
-    if ( pszMinX && pszMinY && pszMaxX && pszMaxY )
+    /* Wait, we didn't find a FID? */
+    /* Game over, all valid tables must have a FID */
+    if ( ! bFidFound )
     {
-        m_poExtent = new OGREnvelope();
-        m_poExtent->MinX = atof(pszMinX);
-        m_poExtent->MinY = atof(pszMinY);
-        m_poExtent->MaxX = atof(pszMaxX);
-        m_poExtent->MaxY = atof(pszMaxY);
+        CPLError(CE_Failure, CPLE_AppDefined, 
+                 "no primary key defined for table '%s'", m_pszTableName);
+        return OGRERR_FAILURE;
+        
     }
 
-    SQLResultFree(&oResultContents);
-    SQLResultFree(&oResultGeomCols);
+    m_poExtent = new OGREnvelope(oExtent);
+
     SQLResultFree(&oResultTable);
+    SQLResultFree(&oResultGeomCols);
 
     return OGRERR_NONE;
 }
