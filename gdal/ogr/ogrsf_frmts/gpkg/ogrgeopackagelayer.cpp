@@ -31,6 +31,144 @@
 #include "ogrgeopackageutility.h"
 
 
+OGRErr OGRGeoPackageLayer::BuildColumns()
+{
+    if ( ! m_poFeatureDefn )
+    {
+        return OGRERR_FAILURE;
+    }
+
+    /* Always have a primary key */
+    CPLString soColumns = "";
+    soColumns += m_pszFidColumn;
+
+    /* Add a geometry column if there is one (just one) */
+    if ( m_poFeatureDefn->GetGeomFieldCount() )
+    {
+        soColumns += ", ";
+        soColumns += m_poFeatureDefn->GetGeomFieldDefn(0)->GetNameRef();
+    }
+
+    /* Add all the attribute columns */
+    for( int i = 0; i < m_poFeatureDefn->GetFieldCount(); i++ )
+    {
+        soColumns += ", ";
+        soColumns += m_poFeatureDefn->GetFieldDefn(i)->GetNameRef();
+    }
+
+    m_soColumns = soColumns;    
+    return OGRERR_NONE;    
+}
+
+OGRErr OGRGeoPackageLayer::SaveExtent()
+{
+    if ( ! m_bExtentChanged || ! m_poExtent ) 
+        return OGRERR_NONE;
+
+    sqlite3* poDb = m_poDS->GetDatabaseHandle();
+
+    if ( ! poDb ) return OGRERR_FAILURE;
+
+    char *pszSQL = sqlite3_mprintf(
+                "UPDATE gpkg_contents SET "
+                "min_x = %g, min_y = %g, "
+                "max_x = %g, max_y = %g "
+                "WHERE table_name = '%q' AND "
+                "Lower(data_type) = 'features'",
+                m_poExtent->MinX, m_poExtent->MinY,
+                m_poExtent->MaxX, m_poExtent->MaxY,
+                m_pszTableName);
+
+    OGRErr err = SQLCommand(poDb, pszSQL);
+    sqlite3_free(pszSQL);
+    m_bExtentChanged = FALSE;
+    
+    return err;
+}
+
+OGRErr OGRGeoPackageLayer::UpdateExtent( const OGREnvelope *poExtent )
+{
+    if ( ! m_poExtent )
+    {
+        m_poExtent = new OGREnvelope( *poExtent );
+    }
+    m_poExtent->Merge( *poExtent );
+    m_bExtentChanged = TRUE;
+    return OGRERR_NONE;
+}
+
+
+OGRErr OGRGeoPackageLayer::ReadFeature( sqlite3_stmt *poQuery, OGRFeature **ppoFeature )
+{
+    int iColOffset = 0;
+    
+    if ( ! m_poFeatureDefn )
+        return OGRERR_FAILURE;
+
+    OGRFeature *poFeature = new OGRFeature( m_poFeatureDefn );
+    
+    /* Primary key is always first column in our SQL call */
+    poFeature->SetFID(sqlite3_column_int(poQuery, iColOffset++));
+    
+    /* If a geometry column exists, it's next */
+    /* Add a geometry column if there is one (just the first one) */
+    if ( m_poFeatureDefn->GetGeomFieldCount() )
+    {
+        OGRSpatialReference* poSrs = m_poFeatureDefn->GetGeomFieldDefn(0)->GetSpatialRef();
+        int iGpkgSize = sqlite3_column_bytes(poQuery, iColOffset);
+        GByte *pabyGpkg = (GByte *)sqlite3_column_blob(poQuery, iColOffset);
+        OGRGeometry *poGeom = GPkgGeometryToOGR(pabyGpkg, iGpkgSize, poSrs);
+        if ( ! poGeom )
+        {
+            delete poFeature;
+            CPLError( CE_Failure, CPLE_AppDefined, "Unable to read geometry");
+            return OGRERR_FAILURE;
+        }
+        poFeature->SetGeometryDirectly( poGeom );
+        iColOffset++;
+    }
+    
+    /* Read all the attribute columns */
+    for( int i = 0; i < m_poFeatureDefn->GetFieldCount(); i++ )
+    {
+        int iSqliteType = SQLiteFieldFromOGR(m_poFeatureDefn->GetFieldDefn(i)->GetType());
+        int j = iColOffset+i;
+        
+        switch(iSqliteType)
+        {
+            case SQLITE_INTEGER:
+            {
+                int iVal = sqlite3_column_int(poQuery, j);
+                poFeature->SetField(i, iVal);
+                break;
+            }
+            case SQLITE_FLOAT:
+            {
+                double dVal = sqlite3_column_double(poQuery, j);
+                poFeature->SetField(i, dVal);
+                break;
+            }
+            case SQLITE_BLOB:
+            {
+                int iBlobSize = sqlite3_column_bytes(poQuery, j);
+                GByte *pabyBlob = (GByte *)sqlite3_column_blob(poQuery, j);
+                poFeature->SetField(i, iBlobSize, pabyBlob);
+                break;
+            }
+            default: /* SQLITE_TEXT */
+            {
+                const char *pszVal = (const char *)sqlite3_column_text(poQuery, j);
+                poFeature->SetField(i, pszVal);
+                break;
+            }
+        }
+    }
+    
+    /* Pass result back to the caller */
+    *ppoFeature = poFeature;
+
+    return OGRERR_NONE;
+}
 
 OGRErr OGRGeoPackageLayer::ReadTableDefinition()
 {
@@ -218,7 +356,11 @@ OGRGeoPackageLayer::OGRGeoPackageLayer(
     m_pszFidColumn = NULL;
     m_poDS = poDS;
     m_poExtent = NULL;
+    m_bExtentChanged = FALSE;
     m_poFeatureDefn = NULL;
+    m_poQueryStatement = NULL;
+    m_soColumns = "";
+    m_soFilter = "";
 }
 
 
@@ -228,15 +370,21 @@ OGRGeoPackageLayer::OGRGeoPackageLayer(
 
 OGRGeoPackageLayer::~OGRGeoPackageLayer()
 {
+    /* Save metadata back to the database */
+    SaveExtent();
+
+    /* Clean up resources in memory */
     if ( m_pszTableName )
         CPLFree( m_pszTableName );
-        
+    
     if ( m_poExtent )
         delete m_poExtent;
     
+    if ( m_poQueryStatement )
+        sqlite3_finalize(m_poQueryStatement);
+    
     if ( m_poFeatureDefn )
         m_poFeatureDefn->Release();
-
 }
 
 
@@ -255,7 +403,7 @@ OGRErr OGRGeoPackageLayer::CreateField( OGRFieldDefn *poField, int bApproxOK )
     }
 
     OGRErr err = m_poDS->AddColumn(m_pszTableName, 
-                                   poField->GetNameRef(), 
+                                   poField->GetNameRef(),
                                    GPkgFieldFromOGR(poField->GetType()));
 
     if ( err != OGRERR_NONE )
@@ -418,6 +566,11 @@ OGRErr OGRGeoPackageLayer::CreateFeature( OGRFeature *poFeature )
     
     err = sqlite3_finalize(poStmt);
 
+    /* Update the layer extents with this new object */
+    OGREnvelope oEnv;
+    poGeom->getEnvelope(&oEnv);
+    UpdateExtent(&oEnv);
+
     /* Retrieve the FID value */
     char *pszSQL = sqlite3_mprintf("SELECT seq FROM sqlite_sequence WHERE name = '%q'", m_pszTableName);
     int iFidNew = SQLGetInteger(poDb, pszSQL, &err);
@@ -428,6 +581,108 @@ OGRErr OGRGeoPackageLayer::CreateFeature( OGRFeature *poFeature )
     /* All done! */
 	return OGRERR_NONE;
 }
+
+/************************************************************************/
+/*                         SetAttributeFilter()                         */
+/************************************************************************/
+
+OGRErr OGRGeoPackageLayer::SetAttributeFilter( const char *pszQuery )
+
+{
+    if( pszQuery == NULL )
+        m_soFilter = "";
+    else
+        m_soFilter = pszQuery;
+
+    ResetReading();
+    return OGRERR_NONE;
+}
+
+
+/************************************************************************/
+/*                      ResetReading()                                  */
+/************************************************************************/
+
+void OGRGeoPackageLayer::ResetReading()
+{
+    if ( m_poQueryStatement )
+    {
+        sqlite3_finalize(m_poQueryStatement);
+        m_poQueryStatement = NULL;
+    }
+    
+    BuildColumns();
+    return;
+}
+
+
+/************************************************************************/
+/*                        GetNextFeature()                              */
+/************************************************************************/
+
+OGRFeature* OGRGeoPackageLayer::GetNextFeature()
+{
+    /* There is no active query statement set up, */
+    /* so job #1 is to prepare the statement. */
+    if ( ! m_poQueryStatement )
+    {
+        CPLString soSQL = "SELECT ";
+        soSQL += m_soColumns + " FROM ";
+        soSQL += m_pszTableName;
+        if ( m_soFilter != "" )
+            soSQL += " WHERE " + m_soFilter;
+        
+        int err = sqlite3_prepare(m_poDS->GetDatabaseHandle(), soSQL.c_str(), -1, &m_poQueryStatement, NULL);
+        if ( err != SQLITE_OK )
+        {
+            m_poQueryStatement = NULL;
+            CPLError( CE_Failure, CPLE_AppDefined, "failed to prepare SQL: %s", soSQL.c_str());            
+            return NULL;
+        }
+    }
+    
+    while ( TRUE )
+    {
+        int err = sqlite3_step(m_poQueryStatement);
+        
+        /* Nothing left in statement? NULL return indicates to caller */
+        /* that there are no features left */
+        if ( err == SQLITE_DONE )
+        {
+            return NULL;
+        }
+        /* Got a row, let's read it */
+        else if ( err == SQLITE_ROW )
+        {
+            OGRFeature *poFeature;
+            
+            /* Fetch the feature */
+            if ( ReadFeature(m_poQueryStatement, &poFeature) != OGRERR_NONE )
+                return NULL;
+            
+            if( (m_poFilterGeom == NULL || FilterGeometry(poFeature->GetGeometryRef()) ) &&
+                (m_poAttrQuery  == NULL || m_poAttrQuery->Evaluate(poFeature)) )
+            {
+                return poFeature;                
+            }
+
+            /* This feature doesn't pass the filters */
+            /* So delete it and loop again to try the next row */
+            delete poFeature;
+        }
+        else 
+        {
+            /* Got neither a row, nor the end of the query. */
+            /* Something terrible has happened, break out of loop */
+            /* CPLError( CE_Failure, CPLE_AppDefined, "unable to step through query statement"); */
+            return NULL;
+        }
+
+    }
+
+}	
+
+
 
 /************************************************************************/
 /*                      TestCapability()                                */
@@ -445,3 +700,4 @@ int OGRGeoPackageLayer::TestCapability ( const char * pszCap )
     }
     return FALSE;
 }
+

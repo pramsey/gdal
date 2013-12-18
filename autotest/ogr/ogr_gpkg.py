@@ -228,7 +228,7 @@ def ogr_gpkg_6():
 
 
 ###############################################################################
-# Add a feature 
+# Add a feature / read a feature
 
 def ogr_gpkg_7():
 
@@ -241,7 +241,23 @@ def ogr_gpkg_7():
         gdaltest.post_reason('cannot create feature')
         return 'fail'
 
+    # Read back what we just inserted
+    lyr.ResetReading()
+    feat_read = lyr.GetNextFeature()
+    if feat_read.GetField('dummy') != 'a dummy value':
+        gdaltest.post_reason('output does not match input')
+        return 'fail'
+
+    # Only inserted one thing, so second feature should return NULL
+    feat_read = lyr.GetNextFeature()
+    if feat_read is not None:
+        gdaltest.post_reason('last call should return NULL')
+        return 'fail'
+
+        
     return 'success'
+
+
 
 
 ###############################################################################

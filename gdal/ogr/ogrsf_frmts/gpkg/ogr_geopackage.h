@@ -146,7 +146,12 @@ class OGRGeoPackageLayer : public OGRLayer
     int                         m_iSrs;
     OGRGeoPackageDataSource*    m_poDS;
     OGREnvelope*                m_poExtent;
+    CPLString                   m_soColumns;
+    CPLString                   m_soFilter;
+    OGRBoolean                  m_bExtentChanged;
     OGRFeatureDefn*             m_poFeatureDefn;
+    sqlite3_stmt*               m_poQueryStatement;
+    
     
     public:
     
@@ -154,16 +159,23 @@ class OGRGeoPackageLayer : public OGRLayer
                                             const char * pszTableName );
                         ~OGRGeoPackageLayer();
 
+    /* OGR API methods */
     OGRFeatureDefn*     GetLayerDefn() { return m_poFeatureDefn; }
     int                 TestCapability( const char * );
     OGRErr              CreateField( OGRFieldDefn *poField, int bApproxOK = TRUE );
-    
-    virtual void        ResetReading() {}
-    virtual OGRFeature *GetNextFeature() { return NULL; }
+    void                ResetReading();
 	OGRErr				CreateFeature( OGRFeature *poFeater );
+    OGRErr              SetAttributeFilter( const char *pszQuery );
+    OGRFeature*         GetNextFeature();
+    // void                SetSpatialFilter( int iGeomField, OGRGeometry * poGeomIn );
 
 
+    /* GPKG methods */
+    OGRErr              ReadFeature( sqlite3_stmt *poQuery, OGRFeature **ppoFeature );
     OGRErr              ReadTableDefinition();
+    OGRErr              UpdateExtent( const OGREnvelope *poExtent );
+    OGRErr              SaveExtent();
+    OGRErr              BuildColumns();
 
 
 /*    
