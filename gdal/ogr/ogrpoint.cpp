@@ -288,11 +288,22 @@ OGRErr  OGRPoint::exportToWkb( OGRwkbByteOrder eByteOrder,
 /* -------------------------------------------------------------------- */
 /*      Copy in the raw data.                                           */
 /* -------------------------------------------------------------------- */
-    memcpy( pabyData+5, &x, 16 );
 
-    if( nCoordDimension == 3 )
+    if ( IsEmpty() && eWkbVariant == wkbVariantIso )
     {
-        memcpy( pabyData + 5 + 16, &z, 8 );
+        double dNan = std::numeric_limits<double>::quiet_NaN();
+        memcpy( pabyData+5, &dNan, 8 );
+        memcpy( pabyData+5+8, &dNan, 8 );
+        if( nCoordDimension == 3 )
+            memcpy( pabyData+5+16, &dNan, 8 );
+    }
+    else
+    {
+        memcpy( pabyData+5, &x, 16 );
+        if( nCoordDimension == 3 )
+        {
+            memcpy( pabyData + 5 + 16, &z, 8 );
+        }
     }
     
 /* -------------------------------------------------------------------- */
