@@ -228,7 +228,7 @@ def ogr_gpkg_6():
 
 
 ###############################################################################
-# Add a feature / read a feature
+# Add a feature / read a feature / delete a feature
 
 def ogr_gpkg_7():
 
@@ -264,16 +264,38 @@ def ogr_gpkg_7():
         return 'fail'
 
     # Random read a feature
-    feat_read = lyr.GetFeature(feat.GetFID())
-    if feat_read.GetField('dummy') != 'who you calling a dummy?':
+    feat_read_random = lyr.GetFeature(feat.GetFID())
+    if feat_read_random.GetField('dummy') != 'who you calling a dummy?':
         gdaltest.post_reason('random read output does not match input')
         return 'fail'
-    
 
+    # Random write a feature
+    feat.SetField('dummy', 'i am no dummy')
+    lyr.SetFeature(feat)
+    feat_read_random = lyr.GetFeature(feat.GetFID())
+    if feat_read_random.GetField('dummy') != 'i am no dummy':
+        gdaltest.post_reason('random read output does not match random write input')
+        return 'fail'
+
+    # Delete a feature
+    lyr.DeleteFeature(feat.GetFID())
+    if lyr.GetFeatureCount() != 1:
+        gdaltest.post_reason('delete feature did not delete')
+        return 'fail'
+        
+    # Delete the layer
+    if gdaltest.gpkg_ds.DeleteLayer('field_test_layer') != 0:
+        gdaltest.post_reason( 'got error code from DeleteLayer(field_test_layer)' )
+    
     return 'success'
 
 
+###############################################################################
+# Test a variety of geometry feature types and attribute types
 
+def ogr_gpkg_8():
+
+    return 'success'
 
 ###############################################################################
 

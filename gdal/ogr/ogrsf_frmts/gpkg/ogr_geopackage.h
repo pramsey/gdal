@@ -169,6 +169,7 @@ class OGRGeoPackageLayer : public OGRLayer
     OGRErr              SetFeature( OGRFeature *poFeature );
     OGRErr              DeleteFeature(long nFID);
     OGRErr              SetAttributeFilter( const char *pszQuery );
+    OGRErr              SyncToDisk();
     OGRFeature*         GetNextFeature();
     OGRFeature*         GetFeature(long nFID);
     const char*         GetFIDColumn();	

@@ -341,7 +341,8 @@ CPLString OGRGeoPackageLayer::FeatureGenerateSQL( OGRFeature *poFeature, OGRBool
         else 
         {
             osSQLFront += ", ";
-            osSQLBack += ", ";
+            if ( !bUpdate )
+                osSQLBack += ", ";
         }
 
         osSQLFront += poFeatureDefn->GetFieldDefn(i)->GetNameRef();
@@ -975,6 +976,16 @@ const char* OGRGeoPackageLayer::GetFIDColumn()
         return "";
     else
         return m_pszFidColumn;
+}
+
+/************************************************************************/
+/*                        SyncToDisk()                                  */
+/************************************************************************/
+
+OGRErr OGRGeoPackageLayer::SyncToDisk()
+{
+    SaveExtent();
+    return OGRERR_NONE;
 }
 
 /************************************************************************/
