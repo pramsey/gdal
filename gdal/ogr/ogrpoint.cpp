@@ -250,6 +250,10 @@ OGRErr OGRPoint::importFromWkb( unsigned char * pabyData,
         z = 0;
         nCoordDimension = 2;
     }
+    
+    /* Interpret POINT(NaN NaN NaN) as POINT EMPTY */
+    if ( CPLIsNan(x) && CPLIsNan(y) && (nCoordDimension != 3 || CPLIsNan(z)) )
+        nCoordDimension = 0;    
 
     return OGRERR_NONE;
 }
