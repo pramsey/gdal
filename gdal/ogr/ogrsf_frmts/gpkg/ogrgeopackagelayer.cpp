@@ -642,11 +642,10 @@ OGRFeature* OGRGeoPackageLayer::GetNextFeature()
     /* so job #1 is to prepare the statement. */
     if ( ! m_poQueryStatement )
     {
-        CPLString soSQL = "SELECT ";
-        soSQL += m_soColumns + " FROM ";
-        soSQL += m_pszTableName;
+        CPLString soSQL;
+        soSQL.Printf("SELECT %s FROM %s ", m_soColumns.c_str(), m_pszTableName);
         if ( m_soFilter != "" )
-            soSQL += " WHERE " + m_soFilter;
+            soSQL += "WHERE " + m_soFilter;
         
         int err = sqlite3_prepare(m_poDS->GetDatabaseHandle(), soSQL.c_str(), -1, &m_poQueryStatement, NULL);
         if ( err != SQLITE_OK )
@@ -698,6 +697,58 @@ OGRFeature* OGRGeoPackageLayer::GetNextFeature()
 
 }	
 
+/************************************************************************/
+/*                        GetFeature()                                  */
+/************************************************************************/
+
+OGRFeature* OGRGeoPackageLayer::GetFeature(long nFID)
+{
+    /* No FID, no answer. */
+    if (nFID == OGRNullFID)
+        return NULL;
+    
+    /* Clear out any existing query */
+    ResetReading();
+
+    /* No filters apply, just use the FID */
+    CPLString soSQL;
+    soSQL.Printf("SELECT %s FROM %s WHERE %s = '%ld'",
+                 m_soColumns.c_str(), m_pszTableName, m_pszFidColumn, nFID);
+
+    int err = sqlite3_prepare(m_poDS->GetDatabaseHandle(), soSQL.c_str(), -1, &m_poQueryStatement, NULL);
+    if ( err != SQLITE_OK )
+    {
+        m_poQueryStatement = NULL;
+        CPLError( CE_Failure, CPLE_AppDefined, "failed to prepare SQL: %s", soSQL.c_str());            
+        return NULL;
+    }
+    
+    /* Should be only one or zero results */
+    err = sqlite3_step(m_poQueryStatement);
+        
+    /* Nothing left in statement? NULL return indicates to caller */
+    /* that there are no features left */
+    if ( err == SQLITE_DONE )
+        return NULL;
+
+    /* Aha, got one */
+    if ( err == SQLITE_ROW )
+    {
+        OGRFeature *poFeature;
+        
+        /* Fetch the feature */
+        if ( ReadFeature(m_poQueryStatement, &poFeature) != OGRERR_NONE )
+            return NULL;
+            
+        if ( poFeature )
+            return poFeature;                
+        else 
+            return NULL;
+    }
+    
+    /* Error out on all other return codes */
+    return NULL;
+}
 
 
 /************************************************************************/
@@ -706,14 +757,15 @@ OGRFeature* OGRGeoPackageLayer::GetNextFeature()
 
 int OGRGeoPackageLayer::TestCapability ( const char * pszCap )
 {
-    if ( EQUAL(pszCap, OLCCreateField) )
+    if ( EQUAL(pszCap, OLCCreateField) ||
+         EQUAL(pszCap, OLCSequentialWrite) ||
+         EQUAL(pszCap, OLCRandomRead) )
     {
-         return TRUE;
+        return TRUE;
     }
-    if ( EQUAL(pszCap, OLCSequentialWrite) )
+    else
     {
-         return TRUE;
+        return FALSE;
     }
-    return FALSE;
 }
 

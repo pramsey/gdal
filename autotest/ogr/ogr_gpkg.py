@@ -254,7 +254,22 @@ def ogr_gpkg_7():
         gdaltest.post_reason('last call should return NULL')
         return 'fail'
 
-        
+    # Add another feature
+    geom = ogr.CreateGeometryFromWkt('POINT(100 100)')
+    feat = ogr.Feature(lyr.GetLayerDefn())
+    feat.SetGeometry(geom)
+    feat.SetField('dummy', 'who you calling a dummy?')
+    if lyr.CreateFeature(feat) != 0:
+        gdaltest.post_reason('cannot create feature')
+        return 'fail'
+
+    # Random read a feature
+    feat_read = lyr.GetFeature(feat.GetFID())
+    if feat_read.GetField('dummy') != 'who you calling a dummy?':
+        gdaltest.post_reason('random read output does not match input')
+        return 'fail'
+    
+
     return 'success'
 
 
