@@ -165,6 +165,7 @@ class OGRGeoPackageLayer : public OGRLayer
     OGRErr              CreateField( OGRFieldDefn *poField, int bApproxOK = TRUE );
     void                ResetReading();
 	OGRErr				CreateFeature( OGRFeature *poFeater );
+    OGRErr              DeleteFeature(long nFID);
     OGRErr              SetAttributeFilter( const char *pszQuery );
     OGRFeature*         GetNextFeature();
     OGRFeature*         GetFeature(long nFID);

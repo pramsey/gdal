@@ -712,7 +712,7 @@ OGRFeature* OGRGeoPackageLayer::GetFeature(long nFID)
 
     /* No filters apply, just use the FID */
     CPLString soSQL;
-    soSQL.Printf("SELECT %s FROM %s WHERE %s = '%ld'",
+    soSQL.Printf("SELECT %s FROM %s WHERE %s = %ld",
                  m_soColumns.c_str(), m_pszTableName, m_pszFidColumn, nFID);
 
     int err = sqlite3_prepare(m_poDS->GetDatabaseHandle(), soSQL.c_str(), -1, &m_poQueryStatement, NULL);
@@ -748,6 +748,31 @@ OGRFeature* OGRGeoPackageLayer::GetFeature(long nFID)
     
     /* Error out on all other return codes */
     return NULL;
+}
+
+/************************************************************************/
+/*                        DeleteFeature()                               */
+/************************************************************************/
+
+OGRErr OGRGeoPackageLayer::DeleteFeature(long nFID)	
+{
+    /* No FID, no answer. */
+    if (nFID == OGRNullFID)
+    {
+        CPLError( CE_Failure, CPLE_AppDefined, "delete feature called with null FID");
+        return OGRERR_FAILURE;
+    }
+    
+    /* Clear out any existing query */
+    ResetReading();
+
+    /* No filters apply, just use the FID */
+    CPLString soSQL;
+    soSQL.Printf("DELETE FROM %s WHERE %s = %ld",
+                 m_pszTableName, m_pszFidColumn, nFID);
+
+    
+    return SQLCommand(m_poDS->GetDatabaseHandle(), soSQL.c_str());
 }
 
 /************************************************************************/
