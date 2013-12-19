@@ -1212,8 +1212,9 @@ GDALCreateGenImgProjTransformer2( GDALDatasetH hSrcDS, GDALDatasetH hDstDS,
              && (pszMethod == NULL || EQUAL(pszMethod,"GCP_TPS")) )
     {
         psInfo->pSrcTPSTransformArg = 
-            GDALCreateTPSTransformer( GDALGetGCPCount( hSrcDS ),
-                                      GDALGetGCPs( hSrcDS ), FALSE );
+            GDALCreateTPSTransformerInt( GDALGetGCPCount( hSrcDS ),
+                                         GDALGetGCPs( hSrcDS ), FALSE,
+                                         papszOptions);
         if( psInfo->pSrcTPSTransformArg == NULL )
         {
             GDALDestroyGenImgProjTransformer( psInfo );
@@ -1295,13 +1296,7 @@ GDALCreateGenImgProjTransformer2( GDALDatasetH hSrcDS, GDALDatasetH hDstDS,
                 sizeof(double) * 6 );
     }
     else if( (pszDstMethod == NULL || EQUAL(pszDstMethod,"GEOTRANSFORM"))
-        && GDALGetGeoTransform( hDstDS, psInfo->adfDstGeoTransform ) == CE_None
-        && (psInfo->adfDstGeoTransform[0] != 0.0
-            || psInfo->adfDstGeoTransform[1] != 1.0
-            || psInfo->adfDstGeoTransform[2] != 0.0
-            || psInfo->adfDstGeoTransform[3] != 0.0
-            || psInfo->adfDstGeoTransform[4] != 0.0
-            || ABS(psInfo->adfDstGeoTransform[5]) != 1.0) )
+        && GDALGetGeoTransform( hDstDS, psInfo->adfDstGeoTransform ) == CE_None)
     {
         if( pszDstWKT == NULL )
             pszDstWKT = GDALGetProjectionRef( hDstDS );
@@ -1349,8 +1344,9 @@ GDALCreateGenImgProjTransformer2( GDALDatasetH hSrcDS, GDALDatasetH hDstDS,
              && (pszDstMethod == NULL || EQUAL(pszDstMethod,"GCP_TPS")) )
     {
         psInfo->pDstTPSTransformArg = 
-            GDALCreateTPSTransformer( GDALGetGCPCount( hDstDS ),
-                                      GDALGetGCPs( hDstDS ), FALSE );
+            GDALCreateTPSTransformerInt( GDALGetGCPCount( hDstDS ),
+                                         GDALGetGCPs( hDstDS ), FALSE,
+                                         papszOptions );
         if( psInfo->pDstTPSTransformArg == NULL )
         {
             GDALDestroyGenImgProjTransformer( psInfo );
