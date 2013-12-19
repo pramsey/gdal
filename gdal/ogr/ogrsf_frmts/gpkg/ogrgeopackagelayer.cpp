@@ -750,6 +750,17 @@ OGRFeature* OGRGeoPackageLayer::GetFeature(long nFID)
     return NULL;
 }
 
+/************************************************************************/
+/*                      GetFIDColumn()                                  */
+/************************************************************************/
+
+const char* OGRGeoPackageLayer::GetFIDColumn()
+{
+    if ( ! m_pszFidColumn )
+        return "";
+    else
+        return m_pszFidColumn;
+}
 
 /************************************************************************/
 /*                      TestCapability()                                */

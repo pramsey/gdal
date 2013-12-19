@@ -168,6 +168,8 @@ class OGRGeoPackageLayer : public OGRLayer
     OGRErr              SetAttributeFilter( const char *pszQuery );
     OGRFeature*         GetNextFeature();
     OGRFeature*         GetFeature(long nFID);
+    const char*         GetFIDColumn();	
+    
     // void                SetSpatialFilter( int iGeomField, OGRGeometry * poGeomIn );
 
 
