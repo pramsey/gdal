@@ -159,12 +159,14 @@ class OGRGeoPackageLayer : public OGRLayer
                                             const char * pszTableName );
                         ~OGRGeoPackageLayer();
 
+    /************************************************************************/
     /* OGR API methods */
     OGRFeatureDefn*     GetLayerDefn() { return m_poFeatureDefn; }
     int                 TestCapability( const char * );
     OGRErr              CreateField( OGRFieldDefn *poField, int bApproxOK = TRUE );
     void                ResetReading();
 	OGRErr				CreateFeature( OGRFeature *poFeater );
+    OGRErr              SetFeature( OGRFeature *poFeature );
     OGRErr              DeleteFeature(long nFID);
     OGRErr              SetAttributeFilter( const char *pszQuery );
     OGRFeature*         GetNextFeature();
@@ -173,13 +175,20 @@ class OGRGeoPackageLayer : public OGRLayer
     
     // void                SetSpatialFilter( int iGeomField, OGRGeometry * poGeomIn );
 
-
-    /* GPKG methods */
-    OGRErr              ReadFeature( sqlite3_stmt *poQuery, OGRFeature **ppoFeature );
     OGRErr              ReadTableDefinition();
+
+    /************************************************************************/
+    /* GPKG methods */
+    
+    private:
+    
+    OGRErr              ReadFeature( sqlite3_stmt *poQuery, OGRFeature **ppoFeature );
     OGRErr              UpdateExtent( const OGREnvelope *poExtent );
     OGRErr              SaveExtent();
     OGRErr              BuildColumns();
+    OGRBoolean          IsGeomFieldSet( OGRFeature *poFeature );
+    OGRErr              FeatureBindParameters( OGRFeature *poFeature, sqlite3_stmt *poStmt );
+    CPLString           FeatureGenerateSQL( OGRFeature *poFeature, OGRBoolean bUpdate );
 
 
 /*    
