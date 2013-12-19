@@ -30,7 +30,12 @@
 #include "ogr_geopackage.h"
 #include "ogrgeopackageutility.h"
 
-
+//----------------------------------------------------------------------
+// SaveExtent()
+// 
+// Write the current contents of the layer envelope down to the
+// gpkg_contents metadata table.
+//
 OGRErr OGRGeoPackageLayer::SaveExtent()
 {
     if ( ! m_bExtentChanged || ! m_poExtent ) 
@@ -57,6 +62,12 @@ OGRErr OGRGeoPackageLayer::SaveExtent()
     return err;
 }
 
+//----------------------------------------------------------------------
+// UpdateExtent()
+// 
+// Expand the layer envelope if necessary to reflect the bounds
+// of new features being added to the layer.
+//
 OGRErr OGRGeoPackageLayer::UpdateExtent( const OGREnvelope *poExtent )
 {
     if ( ! m_poExtent )
@@ -68,6 +79,12 @@ OGRErr OGRGeoPackageLayer::UpdateExtent( const OGREnvelope *poExtent )
     return OGRERR_NONE;
 }
 
+//----------------------------------------------------------------------
+// BuildColumns()
+// 
+// Save a list of columns (fid, geometry, attributes) suitable
+// for use in a SELECT query that retrieves all fields.
+//
 OGRErr OGRGeoPackageLayer::BuildColumns()
 {
     if ( ! m_poFeatureDefn || ! m_pszFidColumn )
@@ -96,6 +113,11 @@ OGRErr OGRGeoPackageLayer::BuildColumns()
     return OGRERR_NONE;    
 }
 
+//----------------------------------------------------------------------
+// ReadFeature()
+// 
+// Convert a row in a statement into an OGRFeature.
+//
 OGRErr OGRGeoPackageLayer::ReadFeature( sqlite3_stmt *poQuery, OGRFeature **ppoFeature )
 {
     int iColOffset = 0;
@@ -172,6 +194,12 @@ OGRErr OGRGeoPackageLayer::ReadFeature( sqlite3_stmt *poQuery, OGRFeature **ppoF
     return OGRERR_NONE;
 }
 
+//----------------------------------------------------------------------
+// IsGeomFieldSet()
+// 
+// Utility method to determine if there is a non-Null geometry
+// in an OGRGeometry.
+//
 OGRBoolean OGRGeoPackageLayer::IsGeomFieldSet( OGRFeature *poFeature )
 {
     if ( poFeature->GetDefnRef()->GetGeomFieldCount() && 
@@ -185,6 +213,14 @@ OGRBoolean OGRGeoPackageLayer::IsGeomFieldSet( OGRFeature *poFeature )
     }    
 }
 
+//----------------------------------------------------------------------
+// FeatureBindParameters()
+// 
+// Selectively bind the values of an OGRFeature to a prepared 
+// statement, prior to execution. Carefully binds exactly the 
+// same parameters that have been set up by FeatureGenerateSQL()
+// as bindable.
+//
 OGRErr OGRGeoPackageLayer::FeatureBindParameters( OGRFeature *poFeature, sqlite3_stmt *poStmt )
 {
     OGRFeatureDefn *poFeatureDefn = poFeature->GetDefnRef();
@@ -253,6 +289,14 @@ OGRErr OGRGeoPackageLayer::FeatureBindParameters( OGRFeature *poFeature, sqlite3
     return OGRERR_NONE;
 }
 
+//----------------------------------------------------------------------
+// FeatureGenerateSQL()
+// 
+// Build a SQL INSERT/UPDATE statement that only references those
+// fields in the OGRFeature that have values set. Values are not
+// writting into the SQL, but are left as '?' tokens for later binding
+// by FeatureBindParameters().
+//
 CPLString OGRGeoPackageLayer::FeatureGenerateSQL( OGRFeature *poFeature, OGRBoolean bUpdate )
 {
     OGRBoolean bNeedComma;
@@ -314,7 +358,15 @@ CPLString OGRGeoPackageLayer::FeatureGenerateSQL( OGRFeature *poFeature, OGRBool
     return osSQLFront + osSQLBack;
 }
 
-
+//----------------------------------------------------------------------
+// ReadTableDefinition()
+// 
+// Initialization routine. Read all the metadata about a table, 
+// starting from just the table name. Reads information from GPKG
+// metadata tables and from SQLite table metadata. Uses it to 
+// populate OGRSpatialReference information and OGRFeatureDefn objects, 
+// among others.
+//
 OGRErr OGRGeoPackageLayer::ReadTableDefinition()
 {
     OGRErr err;
@@ -504,12 +556,15 @@ OGRErr OGRGeoPackageLayer::ReadTableDefinition()
     SQLResultFree(&oResultTable);
     SQLResultFree(&oResultGeomCols);
 
+    /* Update the columns string */
+    BuildColumns();
+
     return OGRERR_NONE;
 }
 
 
 /************************************************************************/
-/*                      OGRGeoPackageLaye()                             */
+/*                      OGRGeoPackageLayer()                            */
 /************************************************************************/
 
 OGRGeoPackageLayer::OGRGeoPackageLayer(
