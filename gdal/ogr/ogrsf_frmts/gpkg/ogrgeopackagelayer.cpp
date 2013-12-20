@@ -287,7 +287,7 @@ OGRErr OGRGeoPackageLayer::FeatureBindUpdateParameters( OGRFeature *poFeature, s
                 default:
                 {
                     const char *pszVal = poFeature->GetFieldAsString(i);
-                    err = sqlite3_bind_text(poStmt, nColCount++, pszVal, strlen(pszVal)+1, NULL);
+                    err = sqlite3_bind_text(poStmt, nColCount++, pszVal, strlen(pszVal), NULL);
                     break;
                 }            
             }            
@@ -368,7 +368,7 @@ OGRErr OGRGeoPackageLayer::FeatureBindInsertParameters( OGRFeature *poFeature, s
             default:
             {
                 const char *pszVal = poFeature->GetFieldAsString(i);
-                err = sqlite3_bind_text(poStmt, nColCount++, pszVal, strlen(pszVal)+1, NULL);
+                err = sqlite3_bind_text(poStmt, nColCount++, pszVal, strlen(pszVal), NULL);
                 break;
             }            
         }
@@ -935,7 +935,7 @@ OGRErr OGRGeoPackageLayer::SetAttributeFilter( const char *pszQuery )
 
 {
     if( pszQuery == NULL )
-        m_soFilter = "";
+        m_soFilter.Clear();
     else
         m_soFilter = pszQuery;
 
@@ -971,10 +971,12 @@ OGRFeature* OGRGeoPackageLayer::GetNextFeature()
     /* so job #1 is to prepare the statement. */
     if ( ! m_poQueryStatement )
     {
+        /* Append the attribute filter, if there is one */
         CPLString soSQL;
-        soSQL.Printf("SELECT %s FROM %s ", m_soColumns.c_str(), m_pszTableName);
-        if ( m_soFilter != "" )
-            soSQL += "WHERE " + m_soFilter;
+        if ( m_soFilter.length() > 0 )
+            soSQL.Printf("SELECT %s FROM %s WHERE %s", m_soColumns.c_str(), m_pszTableName, m_soFilter.c_str());
+        else
+            soSQL.Printf("SELECT %s FROM %s ", m_soColumns.c_str(), m_pszTableName);
         
         int err = sqlite3_prepare(m_poDS->GetDatabaseHandle(), soSQL.c_str(), -1, &m_poQueryStatement, NULL);
         if ( err != SQLITE_OK )
