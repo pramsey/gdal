@@ -1673,6 +1673,11 @@ int GDALGenImgProjTransform( void *pTransformArg, int bDstToSrc,
     void *pTPSTransformArg;
     void *pGeoLocTransformArg;
 
+    for( i = 0; i < nPointCount; i++ )
+    {
+        panSuccess[i] = ( padfX[i] != HUGE_VAL && padfY[i] != HUGE_VAL );
+    }
+
 /* -------------------------------------------------------------------- */
 /*      Convert from src (dst) pixel/line to src (dst)                  */
 /*      georeferenced coordinates.                                      */
@@ -1755,11 +1760,6 @@ int GDALGenImgProjTransform( void *pTransformArg, int bDstToSrc,
                                         nPointCount, padfX, padfY, padfZ,
                                         panSuccess ) )
             return FALSE;
-    }
-    else
-    {
-        for( i = 0; i < nPointCount; i++ )
-            panSuccess[i] = 1;
     }
 
 /* -------------------------------------------------------------------- */
