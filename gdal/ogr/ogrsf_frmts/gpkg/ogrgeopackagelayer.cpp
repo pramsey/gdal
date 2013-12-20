@@ -134,17 +134,20 @@ OGRErr OGRGeoPackageLayer::ReadFeature( sqlite3_stmt *poQuery, OGRFeature **ppoF
     /* Add a geometry column if there is one (just the first one) */
     if ( m_poFeatureDefn->GetGeomFieldCount() )
     {
-        OGRSpatialReference* poSrs = m_poFeatureDefn->GetGeomFieldDefn(0)->GetSpatialRef();
-        int iGpkgSize = sqlite3_column_bytes(poQuery, iColOffset);
-        GByte *pabyGpkg = (GByte *)sqlite3_column_blob(poQuery, iColOffset);
-        OGRGeometry *poGeom = GPkgGeometryToOGR(pabyGpkg, iGpkgSize, poSrs);
-        if ( ! poGeom )
+        if ( sqlite3_column_type(poQuery, iColOffset) != SQLITE_NULL )
         {
-            delete poFeature;
-            CPLError( CE_Failure, CPLE_AppDefined, "Unable to read geometry");
-            return OGRERR_FAILURE;
+            OGRSpatialReference* poSrs = m_poFeatureDefn->GetGeomFieldDefn(0)->GetSpatialRef();
+            int iGpkgSize = sqlite3_column_bytes(poQuery, iColOffset);
+            GByte *pabyGpkg = (GByte *)sqlite3_column_blob(poQuery, iColOffset);
+            OGRGeometry *poGeom = GPkgGeometryToOGR(pabyGpkg, iGpkgSize, poSrs);
+            if ( ! poGeom )
+            {
+                delete poFeature;
+                CPLError( CE_Failure, CPLE_AppDefined, "Unable to read geometry");
+                return OGRERR_FAILURE;
+            }
+            poFeature->SetGeometryDirectly( poGeom );
         }
-        poFeature->SetGeometryDirectly( poGeom );
         iColOffset++;
     }
     

@@ -101,8 +101,8 @@ void OGRRegisterAll()
     RegisterOGRGMT();
 #endif
 #ifdef SQLITE_ENABLED
-    RegisterOGRSQLite();
     RegisterOGRGeoPackage();
+    RegisterOGRSQLite();
 #endif
 #ifdef DODS_ENABLED
     RegisterOGRDODS();
