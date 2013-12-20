@@ -481,7 +481,7 @@ GByte* GPkgGeometryFromOGR(const OGRGeometry *poGeometry, int iSrsId, size_t *sz
         return NULL;
     }
     
-    return pabyWkb;    
+    return pabyWkb; 
 }
 
 typedef struct 
@@ -511,13 +511,13 @@ static OGRErr GPkgHeaderFromWKB(const GByte *pabyGpkg, GPkgHeader *poHeader)
 
     /* Flags */
     GByte byFlags = pabyGpkg[3];
-    poHeader->bEmpty = byFlags & (0x01 << 4);
-    poHeader->bExtended = byFlags & (0x01 << 5);
+    poHeader->bEmpty = (byFlags & (0x01 << 4)) >> 4;
+    poHeader->bExtended = (byFlags & (0x01 << 5)) >> 5;
     poHeader->eByteOrder = (OGRwkbByteOrder)(byFlags & 0x01);
     OGRBoolean bSwap = OGR_SWAP(poHeader->eByteOrder);
 
     /* Envelope */
-    int iEnvelope = byFlags & (0x07 << 1);
+    int iEnvelope = (byFlags & (0x07 << 1)) >> 1;
     if ( iEnvelope == 1 )
         poHeader->iDims = 2; /* 2D envelope */
     else if ( iEnvelope == 2 )

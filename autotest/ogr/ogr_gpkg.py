@@ -295,6 +295,13 @@ def ogr_gpkg_7():
 
 def ogr_gpkg_8():
 
+    # try:
+    #     os.remove( 'tmp/gpkg_test.gpkg' )
+    # except:
+    #     pass
+    # gdaltest.gpkg_dr = ogr.GetDriverByName( 'GPKG' )
+    # gdaltest.gpkg_ds = gdaltest.gpkg_dr.CreateDataSource( 'tmp/gpkg_test.gpkg' )
+
     if gdaltest.gpkg_ds is None:
         return 'skip'
 
@@ -304,34 +311,60 @@ def ogr_gpkg_8():
     lyr = gdaltest.gpkg_ds.CreateLayer( 'tbl_linestring', geom_type = ogr.wkbLineString, srs = srs)
     if lyr is None:
         return 'fail'
-
+    
     ret = lyr.CreateField(ogr.FieldDefn('fld_integer', ogr.OFTInteger))
     ret = lyr.CreateField(ogr.FieldDefn('fld_string', ogr.OFTString))
     ret = lyr.CreateField(ogr.FieldDefn('fld_real', ogr.OFTReal))
-
+    
     geom = ogr.CreateGeometryFromWkt('LINESTRING(5 5,10 5,10 10,5 10)')
     feat = ogr.Feature(lyr.GetLayerDefn())
     feat.SetGeometry(geom)
-
+    
     for i in range(10):
         feat.SetField('fld_integer', 10 + i)
         feat.SetField('fld_real', 3.14159/(i+1) )
         feat.SetField('fld_string', 'test string %d test' % i)
-
+    
         if lyr.CreateFeature(feat) != 0:
             gdaltest.post_reason('cannot create feature %d' % i)
             return 'fail'
-
+    
     feat = ogr.Feature(lyr.GetLayerDefn())
     if lyr.CreateFeature(feat) != 0:
-        gdaltest.post_reason('cannot create empty')
+        gdaltest.post_reason('cannot insert empty')
         return 'fail'
         
     feat.SetFID(2)
     if lyr.SetFeature(feat) != 0:
         gdaltest.post_reason('cannot update with empty')
         return 'fail'
-        
+
+    lyr = gdaltest.gpkg_ds.CreateLayer( 'tbl_polygon', geom_type = ogr.wkbPolygon, srs = srs)
+    if lyr is None:
+        return 'fail'
+
+    ret = lyr.CreateField(ogr.FieldDefn('fld_datetime', ogr.OFTDateTime))
+    ret = lyr.CreateField(ogr.FieldDefn('fld_string', ogr.OFTString))
+
+    geom = ogr.CreateGeometryFromWkt('POLYGON((5 5, 10 5, 10 10, 5 10, 5 5),(6 6, 6 7, 7 7, 7 6, 6 6))')
+    feat = ogr.Feature(lyr.GetLayerDefn())
+    feat.SetGeometry(geom)
+
+    for i in range(10):
+        feat.SetField('fld_string', 'my super string %d' % i)
+        feat.SetField('fld_datetime', '2010-01-01' )
+
+        if lyr.CreateFeature(feat) != 0:
+            gdaltest.post_reason('cannot create polygon feature %d' % i)
+            return 'fail'
+
+    feat = lyr.GetFeature(3)
+    geom_read = feat.GetGeometryRef()
+    if geom.ExportToWkt() != geom_read.ExportToWkt():
+        gdaltest.post_reason('geom output not equal to geom input')
+        return 'fail'
+
+    
     return 'success'
 
 ###############################################################################

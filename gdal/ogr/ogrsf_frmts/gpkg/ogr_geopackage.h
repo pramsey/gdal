@@ -188,8 +188,10 @@ class OGRGeoPackageLayer : public OGRLayer
     OGRErr              SaveExtent();
     OGRErr              BuildColumns();
     OGRBoolean          IsGeomFieldSet( OGRFeature *poFeature );
-    OGRErr              FeatureBindParameters( OGRFeature *poFeature, sqlite3_stmt *poStmt );
-    CPLString           FeatureGenerateSQL( OGRFeature *poFeature, OGRBoolean bUpdate );
+    OGRErr              FeatureBindInsertParameters( OGRFeature *poFeature, sqlite3_stmt *poStmt );
+    CPLString           FeatureGenerateInsertSQL( OGRFeature *poFeature );
+    OGRErr              FeatureBindUpdateParameters( OGRFeature *poFeature, sqlite3_stmt *poStmt );
+    CPLString           FeatureGenerateUpdateSQL( OGRFeature *poFeature );
 
 
 /*    
