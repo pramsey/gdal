@@ -301,6 +301,7 @@ CPLString OGRGeoPackageLayer::FeatureGenerateSQL( OGRFeature *poFeature, OGRBool
 {
     OGRBoolean bNeedComma;
     OGRFeatureDefn *poFeatureDefn = poFeature->GetDefnRef();
+    int nFieldCount = 0;
 
     /* Set up our SQL string basics */
     CPLString osSQLFront;
@@ -326,6 +327,7 @@ CPLString OGRGeoPackageLayer::FeatureGenerateSQL( OGRFeature *poFeature, OGRBool
             osSQLBack += "?";
 
         bNeedComma = TRUE;
+        nFieldCount++;
     }
 
     /* Add attribute column names (except FID) to the SQL */
@@ -351,10 +353,21 @@ CPLString OGRGeoPackageLayer::FeatureGenerateSQL( OGRFeature *poFeature, OGRBool
             osSQLFront += "=?";
         else
             osSQLBack += "?";
+        
+        nFieldCount++;
     }
     
     if ( !bUpdate )
         osSQLBack += ")";
+
+    /* Wait a minute, we found no non-null fields */
+    /* so, this is a FID-only insert operation */
+    if ( nFieldCount == 0 && ! bUpdate )
+    {
+        osSQLFront.Clear();
+        osSQLFront.Printf("INSERT INTO %s (%s) VALUES(NULL)", m_pszTableName, m_pszFidColumn);
+        return osSQLFront;
+    }
 
     return osSQLFront + osSQLBack;
 }

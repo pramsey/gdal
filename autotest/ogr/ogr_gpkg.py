@@ -295,6 +295,43 @@ def ogr_gpkg_7():
 
 def ogr_gpkg_8():
 
+    if gdaltest.gpkg_ds is None:
+        return 'skip'
+
+    srs = osr.SpatialReference()
+    srs.ImportFromEPSG( 4326 )
+
+    lyr = gdaltest.gpkg_ds.CreateLayer( 'tbl_linestring', geom_type = ogr.wkbLineString, srs = srs)
+    if lyr is None:
+        return 'fail'
+
+    ret = lyr.CreateField(ogr.FieldDefn('fld_integer', ogr.OFTInteger))
+    ret = lyr.CreateField(ogr.FieldDefn('fld_string', ogr.OFTString))
+    ret = lyr.CreateField(ogr.FieldDefn('fld_real', ogr.OFTReal))
+
+    geom = ogr.CreateGeometryFromWkt('LINESTRING(5 5,10 5,10 10,5 10)')
+    feat = ogr.Feature(lyr.GetLayerDefn())
+    feat.SetGeometry(geom)
+
+    for i in range(10):
+        feat.SetField('fld_integer', 10 + i)
+        feat.SetField('fld_real', 3.14159/(i+1) )
+        feat.SetField('fld_string', 'test string %d test' % i)
+
+        if lyr.CreateFeature(feat) != 0:
+            gdaltest.post_reason('cannot create feature %d' % i)
+            return 'fail'
+
+    feat = ogr.Feature(lyr.GetLayerDefn())
+    if lyr.CreateFeature(feat) != 0:
+        gdaltest.post_reason('cannot create empty')
+        return 'fail'
+        
+    feat.SetFID(2)
+    if lyr.SetFeature(feat) != 0:
+        gdaltest.post_reason('cannot update with empty')
+        return 'fail'
+        
     return 'success'
 
 ###############################################################################
@@ -308,6 +345,7 @@ gdaltest_list = [
     ogr_gpkg_5,
     ogr_gpkg_6,
     ogr_gpkg_7,
+    ogr_gpkg_8,
 ]
 
 if __name__ == '__main__':
