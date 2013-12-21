@@ -54,7 +54,6 @@ OGRwkbGeometryType OGRMultiPoint::getGeometryType() const
         return wkbMultiPoint;
 }
 
-
 /************************************************************************/
 /*                            getDimension()                            */
 /************************************************************************/

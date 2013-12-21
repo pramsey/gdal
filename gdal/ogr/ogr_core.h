@@ -316,10 +316,8 @@ typedef enum
     wkbMultiPoint25D = 0x80000004, /**< 2.5D extension as per 99-402 */
     wkbMultiLineString25D = 0x80000005, /**< 2.5D extension as per 99-402 */
     wkbMultiPolygon25D = 0x80000006, /**< 2.5D extension as per 99-402 */
-    wkbGeometryCollection25D = 0x80000007, /**< 2.5D extension as per 99-402 */
-        
+    wkbGeometryCollection25D = 0x80000007 /**< 2.5D extension as per 99-402 */
 } OGRwkbGeometryType;
-
 
 /**
  * Output variants of WKB we support. 
