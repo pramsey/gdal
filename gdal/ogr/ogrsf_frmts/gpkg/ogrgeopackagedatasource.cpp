@@ -295,6 +295,7 @@ OGRGeoPackageDataSource::OGRGeoPackageDataSource()
     m_pszFileName = NULL;
     m_papoLayers = NULL;
     m_nLayers = 0;
+    m_bUtf8 = FALSE;
     m_poDb = NULL;
 }
 
@@ -377,6 +378,16 @@ int OGRGeoPackageDataSource::Open(const char * pszFilename, int bUpdate )
     {
         CPLError( CE_Failure, CPLE_AppDefined, "pragma foreign_key_check on '%s' failed", pszFilename);
         return FALSE; 
+    }
+
+    /* OGR UTF-8 capability, we'll advertise UTF-8 support if we have it */
+    if ( OGRERR_NONE == PragmaCheck("encoding", "UTF-8", 1) ) 
+    {
+        m_bUtf8 = TRUE;
+    }
+    else
+    {
+        m_bUtf8 = FALSE;
     }
 
     /* Check for requirement metadata tables */
@@ -476,6 +487,10 @@ int OGRGeoPackageDataSource::Create( const char * pszFilename, char **papszOptio
     }
 
     m_pszFileName = CPLStrdup(pszFilename);
+
+    /* OGR UTF-8 support. If we set the UTF-8 Pragma early on, it */
+    /* will be written into the main file and supported henceforth */
+    SQLCommand(m_poDb, "PRAGMA encoding = \"UTF-8\"");
 
     /* Requirement 2: A GeoPackage SHALL contain 0x47503130 ("GP10" in ASCII) in the application id */
     /* http://opengis.github.io/geopackage/#_file_format */

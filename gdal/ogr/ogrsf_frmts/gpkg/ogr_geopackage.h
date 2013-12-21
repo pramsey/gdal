@@ -70,6 +70,7 @@ class OGRGeoPackageDataSource : public OGRDataSource
     OGRLayer**          m_papoLayers;
     int                 m_nLayers;
     int                 m_bUpdate;
+    int                 m_bUtf8;
     sqlite3*            m_poDb;
     
     
@@ -100,6 +101,7 @@ class OGRGeoPackageDataSource : public OGRDataSource
         int                 GetSrsId( const OGRSpatialReference * poSRS );
         OGRSpatialReference* GetSpatialRef( int iSrsId );
         sqlite3*            GetDatabaseHandle();
+        virtual int         GetUTF8() { return m_bUtf8; }
         OGRErr              AddColumn( const char * pszTableName, 
                                        const char * pszColumnName, 
                                        const char * pszColumnType );
