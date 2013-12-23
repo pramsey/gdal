@@ -364,6 +364,24 @@ def ogr_gpkg_8():
         gdaltest.post_reason('geom output not equal to geom input')
         return 'fail'
 
+    # Test out the 3D support...
+    lyr = gdaltest.gpkg_ds.CreateLayer( 'tbl_polygon25d', geom_type = ogr.wkbPolygon25D, srs = srs)
+    if lyr is None:
+        return 'fail'
+        
+    ret = lyr.CreateField(ogr.FieldDefn('fld_string', ogr.OFTString))
+    geom = ogr.CreateGeometryFromWkt('POLYGON((5 5 1, 10 5 2, 10 10 3, 5 104 , 5 5 1),(6 6 4, 6 7 5, 7 7 6, 7 6 7, 6 6 4))')
+    feat = ogr.Feature(lyr.GetLayerDefn())
+    feat.SetGeometry(geom)
+    lyr.CreateFeature(feat)
+
+    lyr.ResetReading()
+    feat = lyr.GetNextFeature()
+    geom_read = feat.GetGeometryRef()
+    if geom.ExportToWkt() != geom_read.ExportToWkt():
+        gdaltest.post_reason('3d geom output not equal to geom input')
+        return 'fail'
+    
     
     return 'success'
 
