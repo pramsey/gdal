@@ -80,10 +80,8 @@ class CPL_DLL OGRGeometry
   private:
     OGRSpatialReference * poSRS;                // may be NULL
 
-
   protected:
     int                   nCoordDimension;
-
     int getIsoGeometryType() const;
     
   public:

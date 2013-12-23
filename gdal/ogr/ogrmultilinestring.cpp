@@ -61,7 +61,6 @@ OGRwkbGeometryType OGRMultiLineString::getGeometryType() const
         return wkbMultiLineString;
 }
 
-
 /************************************************************************/
 /*                            getDimension()                            */
 /************************************************************************/

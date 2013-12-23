@@ -72,7 +72,7 @@ OGRwkbGeometryType OGRLineString::getGeometryType() const
     if( nCoordDimension == 3 )
         return wkbLineString25D;
     else
-        return wkbLineString;    
+        return wkbLineString;
 }
 
 
@@ -855,7 +855,6 @@ OGRErr OGRLineString::importFromWkb( unsigned char * pabyData,
 
     if( err != OGRERR_NONE || eGeometryType != wkbLineString )
         return OGRERR_CORRUPT_DATA;
-
 
 /* -------------------------------------------------------------------- */
 /*      Get the vertex count.                                           */

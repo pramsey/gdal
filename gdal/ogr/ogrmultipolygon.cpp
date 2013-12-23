@@ -53,7 +53,6 @@ OGRwkbGeometryType OGRMultiPolygon::getGeometryType() const
         return wkbMultiPolygon;
 }
 
-
 /************************************************************************/
 /*                            getDimension()                            */
 /************************************************************************/

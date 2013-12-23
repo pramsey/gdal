@@ -112,7 +112,6 @@ OGRwkbGeometryType OGRGeometryCollection::getGeometryType() const
         return wkbGeometryCollection;
 }
 
-
 /************************************************************************/
 /*                            getDimension()                            */
 /************************************************************************/
