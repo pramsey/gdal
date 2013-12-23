@@ -181,39 +181,60 @@ OGRSpatialReference* OGRGeoPackageDataSource::GetSpatialRef(int iSrsId)
     return poSpatialRef;
 }
 
+const char * OGRGeoPackageDataSource::GetSrsName(const OGRSpatialReference * poSRS)
+{
+    const OGR_SRSNode *node;
+    
+    /* Projected coordinate system? */
+    if ( (node = poSRS->GetAttrNode("PROJCS")) )
+    {
+        return node->GetChild(0)->GetValue();
+    }
+    /* Geographic coordinate system? */
+    else if ( (node = poSRS->GetAttrNode("GEOGCS")) )
+    {
+        return node->GetChild(0)->GetValue();
+    }
+    /* Something odd! return empty. */
+    else
+    {
+        return "Unnamed SRS";
+    }
+}
 
-int OGRGeoPackageDataSource::GetSrsId(const OGRSpatialReference * poSRS)
+int OGRGeoPackageDataSource::GetSrsId(const OGRSpatialReference * cpoSRS)
 {
     char *pszWKT = NULL;
     char *pszSQL = NULL;
     int nSRSId = UNDEFINED_SRID;
-    int nMaxSRSId;
     const char* pszAuthorityName;
-    int nAuthorityCode;
+    int nAuthorityCode = 0;
     OGRErr err;
+    OGRBoolean bCanUseAuthorityCode = FALSE;
 
-    if( poSRS == NULL )
+    if( cpoSRS == NULL )
         return UNDEFINED_SRID;
 
-    OGRSpatialReference oSRS(*poSRS);
+    OGRSpatialReference *poSRS = cpoSRS->Clone();
 
-    pszAuthorityName = oSRS.GetAuthorityName(NULL);
+    poSRS->morphFromESRI();
+    pszAuthorityName = poSRS->GetAuthorityName(NULL);
 
     if ( pszAuthorityName == NULL || strlen(pszAuthorityName) == 0 )
     {
         // Try to force identify an EPSG code                                    
-        oSRS.AutoIdentifyEPSG();
+        poSRS->AutoIdentifyEPSG();
 
-        pszAuthorityName = oSRS.GetAuthorityName(NULL);
+        pszAuthorityName = poSRS->GetAuthorityName(NULL);
         if (pszAuthorityName != NULL && EQUAL(pszAuthorityName, "EPSG"))
         {
-            const char* pszAuthorityCode = oSRS.GetAuthorityCode(NULL);
+            const char* pszAuthorityCode = poSRS->GetAuthorityCode(NULL);
             if ( pszAuthorityCode != NULL && strlen(pszAuthorityCode) > 0 )
             {
                 /* Import 'clean' SRS */
-                oSRS.importFromEPSG( atoi(pszAuthorityCode) );
+                poSRS->importFromEPSG( atoi(pszAuthorityCode) );
 
-                pszAuthorityName = oSRS.GetAuthorityName(NULL);
+                pszAuthorityName = poSRS->GetAuthorityName(NULL);
             }
         }
     }
@@ -223,46 +244,69 @@ int OGRGeoPackageDataSource::GetSrsId(const OGRSpatialReference * poSRS)
     {
         // For the root authority name 'EPSG', the authority code
         // should always be integral
-        nAuthorityCode = atoi( oSRS.GetAuthorityCode(NULL) );
+        nAuthorityCode = atoi( poSRS->GetAuthorityCode(NULL) );
 
         pszSQL = sqlite3_mprintf(
                          "SELECT srs_id FROM gpkg_spatial_ref_sys WHERE "
                          "upper(organization) = upper('%q') AND organization_coordsys_id = %d",
                          pszAuthorityName, nAuthorityCode );
         
-        // Got a match? Return it!
         nSRSId = SQLGetInteger(m_poDb, pszSQL, &err);
         sqlite3_free(pszSQL);
         
+        // Got a match? Return it!
         if ( OGRERR_NONE == err )
-            return nSRSId;     
+        {
+            delete poSRS;
+            return nSRSId;
+        }
+        
+        // No match, but maybe we can use the nAuthorityCode as the nSRSId?
+        pszSQL = sqlite3_mprintf(
+                         "SELECT Count(*) FROM gpkg_spatial_ref_sys WHERE "
+                         "srs_id = %d", nAuthorityCode );
+        
+        // Yep, we can!
+        if ( ! SQLGetInteger(m_poDb, pszSQL, &err) && err == OGRERR_NONE )
+            bCanUseAuthorityCode = TRUE;
     }
 
     // Translate SRS to WKT.                                           
-    if( oSRS.exportToWkt( &pszWKT ) != OGRERR_NONE )
+    if( poSRS->exportToWkt( &pszWKT ) != OGRERR_NONE )
     {
+        delete poSRS;
         CPLFree(pszWKT);
         return UNDEFINED_SRID;
     }
 
-    // Get the current maximum srid in the srs table.                  
-    nMaxSRSId = SQLGetInteger(m_poDb, "SELECT MAX(srs_id) FROM gpkg_spatial_ref_sys", &err);
-    if ( OGRERR_NONE != err )
+    // Reuse the authority code number as SRS_ID if we can
+    if ( bCanUseAuthorityCode )
     {
-        return UNDEFINED_SRID;        
+        nSRSId = nAuthorityCode;
+    }
+    // Otherwise, generate a new SRS_ID number (max + 1)
+    else
+    {
+        // Get the current maximum srid in the srs table.                  
+        int nMaxSRSId = SQLGetInteger(m_poDb, "SELECT MAX(srs_id) FROM gpkg_spatial_ref_sys", &err);
+        if ( OGRERR_NONE != err )
+        {
+            CPLFree(pszWKT);
+            delete poSRS;
+            return UNDEFINED_SRID;        
+        }
+
+        nSRSId = nMaxSRSId + 1;
     }
     
-    nSRSId = nMaxSRSId + 1;
-    
     // Add new SRS row to gpkg_spatial_ref_sys
-    if( pszAuthorityName != NULL )
+    if( pszAuthorityName != NULL && nAuthorityCode > 0 )
     {
-        int nAuthorityCode = atoi( oSRS.GetAuthorityCode(NULL) );
         pszSQL = sqlite3_mprintf(
                  "INSERT INTO gpkg_spatial_ref_sys "
                  "(srs_name,srs_id,organization,organization_coordsys_id,definition) "
                  "VALUES ('%s', %d, upper('%s'), %d, '%q')",
-                 "", nSRSId, pszAuthorityName, nAuthorityCode, pszWKT
+                 GetSrsName(poSRS), nSRSId, pszAuthorityName, nAuthorityCode, pszWKT
                  );
     }
     else
@@ -271,7 +315,7 @@ int OGRGeoPackageDataSource::GetSrsId(const OGRSpatialReference * poSRS)
                  "INSERT INTO gpkg_spatial_ref_sys "
                  "(srs_name,srs_id,organization,organization_coordsys_id,definition) "
                  "VALUES ('%s', %d, upper('%s'), %d, '%q')",
-                 "", nSRSId, "NONE", nSRSId, pszWKT
+                 GetSrsName(poSRS), nSRSId, "NONE", nSRSId, pszWKT
                  );
     }
 
@@ -281,6 +325,7 @@ int OGRGeoPackageDataSource::GetSrsId(const OGRSpatialReference * poSRS)
     // Free everything that was allocated.
     CPLFree(pszWKT);    
     sqlite3_free(pszSQL);
+    delete poSRS;
     
     return nSRSId;
 }

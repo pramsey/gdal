@@ -99,6 +99,7 @@ class OGRGeoPackageDataSource : public OGRDataSource
         
         virtual int         IsReadOnly() { return m_bUpdate; }
         int                 GetSrsId( const OGRSpatialReference * poSRS );
+        const char*         GetSrsName( const OGRSpatialReference * poSRS );
         OGRSpatialReference* GetSpatialRef( int iSrsId );
         sqlite3*            GetDatabaseHandle();
         virtual int         GetUTF8() { return m_bUtf8; }
