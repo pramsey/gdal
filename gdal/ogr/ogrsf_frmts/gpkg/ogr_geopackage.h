@@ -154,6 +154,9 @@ class OGRGeoPackageLayer : public OGRLayer
     OGRBoolean                  m_bExtentChanged;
     OGRFeatureDefn*             m_poFeatureDefn;
     sqlite3_stmt*               m_poQueryStatement;
+    sqlite3_stmt*               m_poUpdateStatement;
+    sqlite3_stmt*               m_poInsertStatement;
+    sqlite3_stmt*               m_poFidStatement;
     
     
     public:
@@ -191,10 +194,12 @@ class OGRGeoPackageLayer : public OGRLayer
     OGRErr              SaveExtent();
     OGRErr              BuildColumns();
     OGRBoolean          IsGeomFieldSet( OGRFeature *poFeature );
-    OGRErr              FeatureBindInsertParameters( OGRFeature *poFeature, sqlite3_stmt *poStmt );
+    CPLString           FeatureGenerateUpdateSQL( OGRFeature *poFeature );
     CPLString           FeatureGenerateInsertSQL( OGRFeature *poFeature );
     OGRErr              FeatureBindUpdateParameters( OGRFeature *poFeature, sqlite3_stmt *poStmt );
-    CPLString           FeatureGenerateUpdateSQL( OGRFeature *poFeature );
+    OGRErr              FeatureBindInsertParameters( OGRFeature *poFeature, sqlite3_stmt *poStmt );
+    OGRErr              FeatureBindParameters( OGRFeature *poFeature, sqlite3_stmt *poStmt, int *pnColCount );
+    OGRErr              GetLastFid( const char *pszTableName, int *pnFid );
 
 
 /*    
