@@ -197,11 +197,11 @@ OGRErr OGRGeoPackageLayer::ReadFeature( sqlite3_stmt *poQuery, OGRFeature **ppoF
     return OGRERR_NONE;
 }
 
-OGRErr OGRGeoPackageLayer::GetLastFid( const char *pszTableName, int *pnFid )
+OGRErr OGRGeoPackageLayer::GetLastFid( int *pnFid )
 {
     int err;
     
-    if ( ! (pszTableName && pnFid) ) return OGRERR_FAILURE;
+    if ( ! (m_pszTableName && pnFid) ) return OGRERR_FAILURE;
     
     if ( ! m_poFidStatement )
     {
@@ -211,12 +211,12 @@ OGRErr OGRGeoPackageLayer::GetLastFid( const char *pszTableName, int *pnFid )
         {
             m_poFidStatement = NULL;
             CPLError( CE_Failure, CPLE_AppDefined,
-                      "failed to prepare SQL: %s", osCommand.c_str());        
+                      "failed to prepare SQL: %s", osCommand.c_str());
             return OGRERR_FAILURE;
         }
     }
 
-    err = sqlite3_bind_text(m_poFidStatement, 1, pszTableName, strlen(pszTableName), NULL);
+    err = sqlite3_bind_text(m_poFidStatement, 1, m_pszTableName, strlen(m_pszTableName), NULL);
     if ( err != SQLITE_OK )
         return OGRERR_FAILURE;
 
@@ -231,7 +231,6 @@ OGRErr OGRGeoPackageLayer::GetLastFid( const char *pszTableName, int *pnFid )
     sqlite3_reset(m_poFidStatement);
         
     return OGRERR_NONE;
-    
 }
 
 
@@ -445,7 +444,6 @@ CPLString OGRGeoPackageLayer::FeatureGenerateUpdateSQL( OGRFeature *poFeature )
 {
     OGRBoolean bNeedComma;
     OGRFeatureDefn *poFeatureDefn = poFeature->GetDefnRef();
-    int nFieldCount = 0;
 
     /* Set up our SQL string basics */
     CPLString osUpdate;
@@ -456,7 +454,6 @@ CPLString OGRGeoPackageLayer::FeatureGenerateUpdateSQL( OGRFeature *poFeature )
         osUpdate += poFeatureDefn->GetGeomFieldDefn(0)->GetNameRef();
         osUpdate += "=?";
         bNeedComma = TRUE;
-        nFieldCount++;
     }
 
     /* Add attribute column names (except FID) to the SQL */
@@ -469,7 +466,6 @@ CPLString OGRGeoPackageLayer::FeatureGenerateUpdateSQL( OGRFeature *poFeature )
 
         osUpdate += poFeatureDefn->GetFieldDefn(i)->GetNameRef();
         osUpdate += "=?";
-        nFieldCount++;
     }
     
     CPLString osWhere;
@@ -835,7 +831,7 @@ OGRErr OGRGeoPackageLayer::CreateFeature( OGRFeature *poFeature )
 
     /* Read the latest FID value */
     int iFid;
-    if ( GetLastFid(m_pszTableName, &iFid) == OGRERR_NONE )
+    if ( GetLastFid(&iFid) == OGRERR_NONE )
     {
         poFeature->SetFID(iFid);
     }
@@ -1148,6 +1144,36 @@ OGRErr OGRGeoPackageLayer::SyncToDisk()
 }
 
 /************************************************************************/
+/*                        StartTransaction()                                  */
+/************************************************************************/
+
+OGRErr OGRGeoPackageLayer::StartTransaction()
+{
+    return SQLCommand(m_poDS->GetDatabaseHandle(), "BEGIN");
+}
+
+
+/************************************************************************/
+/*                        CommitTransaction()                                  */
+/************************************************************************/
+
+OGRErr OGRGeoPackageLayer::CommitTransaction()
+{
+    return SQLCommand(m_poDS->GetDatabaseHandle(), "COMMIT");
+}
+
+
+/************************************************************************/
+/*                        RollbackTransaction()                                  */
+/************************************************************************/
+
+OGRErr OGRGeoPackageLayer::RollbackTransaction()
+{
+    return SQLCommand(m_poDS->GetDatabaseHandle(), "ROLLBACK");
+}
+
+
+/************************************************************************/
 /*                      TestCapability()                                */
 /************************************************************************/
 
@@ -1157,7 +1183,8 @@ int OGRGeoPackageLayer::TestCapability ( const char * pszCap )
          EQUAL(pszCap, OLCSequentialWrite) ||
          EQUAL(pszCap, OLCRandomRead) ||
          EQUAL(pszCap, OLCDeleteFeature) ||
-         EQUAL(pszCap, OLCRandomWrite) )
+         EQUAL(pszCap, OLCRandomWrite) ||
+         EQUAL(pszCap, OLCTransactions) )
     {
         return TRUE;
     }
