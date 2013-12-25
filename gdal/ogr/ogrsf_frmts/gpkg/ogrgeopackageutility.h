@@ -42,6 +42,18 @@ typedef struct
     int rc;
 } SQLResult;
 
+typedef struct 
+{
+    OGRBoolean bEmpty;
+    OGRBoolean bExtended;
+    OGRwkbByteOrder eByteOrder;
+    int iSrsId;
+    int iDims;
+    double MinX, MaxX, MinY, MaxY, MinZ, MaxZ;
+    size_t szHeader;
+} GPkgHeader;
+
+
 OGRErr              SQLCommand(sqlite3 *poDb, const char * pszSQL);
 int                 SQLGetInteger(sqlite3 * poDb, const char * pszSQL, OGRErr *err);
 
@@ -62,5 +74,7 @@ const char*         GPkgGeometryTypeFromWKB(OGRwkbGeometryType oType);
 GByte*              GPkgGeometryFromOGR(const OGRGeometry *poGeometry, int iSrsId, size_t *szWkb);
 OGRGeometry*        GPkgGeometryToOGR(GByte *pabyGpkg, size_t szGpkg, OGRSpatialReference *poSrs);
 OGRErr              GPkgEnvelopeToOGR(GByte *pabyGpkg, size_t szGpkg, OGREnvelope *poEnv);
+
+OGRErr              GPkgHeaderFromWKB(const GByte *pabyGpkg, GPkgHeader *poHeader);
 
 #endif

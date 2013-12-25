@@ -32,6 +32,62 @@
 
 
 
+// static void ST_IsEmpty(sqlite3_context *context, int argc, sqlite3_value **argv)
+// {
+//     if ( argc == 1 )
+//     {
+//         GPkgHeader oHeader;
+//         GByte *pabyGpkg = (GByte*)sqlite3_value_blob(argv[0]);
+//         OGRErr err = GPkgHeaderFromWKB(pabyGpkg, &oHeader);
+//         if ( err == OGRERR_NONE )
+//         {
+//             sqlite3_result_int(context, oHeader.bEmpty);
+//             return;
+//         }
+//     }
+// 
+//     sqlite3_result_null(context);
+//     return;
+// }
+// 
+// static void ST_MinX(sqlite3_context *context, int argc, sqlite3_value **argv)
+// {
+//     if ( argc == 1 )
+//     {
+//         GPkgHeader oHeader;
+//         GByte *pabyGpkg = (GByte*)sqlite3_value_blob(argv[0]);
+//         OGRErr err = GPkgHeaderFromWKB(pabyGpkg, &oHeader);
+//         if ( err == OGRERR_NONE && ! oHeader.bEmpty )
+//         {
+//             sqlite3_result_double(context, oHeader.MinX);
+//             return;
+//         }
+//     }
+// 
+//     sqlite3_result_null(context);
+//     return;
+// }
+// 
+// 
+// static void ST_MinY(sqlite3_context *context, int argc, sqlite3_value **argv)
+// {
+//     if ( argc == 1 )
+//     {
+//         GPkgHeader oHeader;
+//         GByte *pabyGpkg = (GByte*)sqlite3_value_blob(argv[0]);
+//         OGRErr err = GPkgHeaderFromWKB(pabyGpkg, &oHeader);
+//         if ( err == OGRERR_NONE && ! oHeader.bEmpty )
+//         {
+//             sqlite3_result_double(context, oHeader.MinY);
+//             return;
+//         }
+//     }
+// 
+//     sqlite3_result_null(context);
+//     return;
+// }
+
+
 /* Cannnot count on the "PRAGMA application_id" command existing */
 /* it is a very recent addition to SQLite. */
 bool OGRGeoPackageDataSource::CheckApplicationId(const char * pszFileName)
@@ -462,7 +518,7 @@ int OGRGeoPackageDataSource::Open(const char * pszFilename, int bUpdate )
             return FALSE;
         }
     }
-    
+        
     /* Load layer definitions for all tables in gpkg_contents & gpkg_geometry_columns */
     SQLResult oResult;
     std::string osSQL = 

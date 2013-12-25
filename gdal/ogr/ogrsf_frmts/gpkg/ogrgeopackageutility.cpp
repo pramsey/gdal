@@ -484,19 +484,8 @@ GByte* GPkgGeometryFromOGR(const OGRGeometry *poGeometry, int iSrsId, size_t *sz
     return pabyWkb; 
 }
 
-typedef struct 
-{
-    OGRBoolean bEmpty;
-    OGRBoolean bExtended;
-    OGRwkbByteOrder eByteOrder;
-    int iSrsId;
-    int iDims;
-    double MinX, MaxX, MinY, MaxY, MinZ, MaxZ;
-    size_t szHeader;
-} GPkgHeader;
 
-
-static OGRErr GPkgHeaderFromWKB(const GByte *pabyGpkg, GPkgHeader *poHeader)
+OGRErr GPkgHeaderFromWKB(const GByte *pabyGpkg, GPkgHeader *poHeader)
 {
     CPLAssert( pabyGpkg != NULL );
     CPLAssert( poHeader != NULL );
