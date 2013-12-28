@@ -473,8 +473,8 @@ GByte* GPkgGeometryFromOGR(const OGRGeometry *poGeometry, int iSrsId, size_t *sz
     
     pabyPtr = pabyWkb + szHeader;
     
-    /* TODO add in WKB variant option for ISO SQL/MM */
-    err = poGeometry->exportToWkb(eByteOrder, pabyPtr);
+    /* Use the wkbVariantIso for ISO SQL/MM output (differs for 3d geometry) */
+    err = poGeometry->exportToWkb(eByteOrder, pabyPtr, wkbVariantIso);
     if ( err != OGRERR_NONE )
     {
         CPLFree(pabyWkb);
