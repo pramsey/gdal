@@ -385,6 +385,20 @@ def ogr_gpkg_8():
     
     return 'success'
 
+
+
+###############################################################################
+# Remove the test db from the tmp directory
+
+def ogr_gpkg_cleanup():
+
+    try:
+        os.remove( 'tmp/gpkg_test.gpkg' )
+    except:
+        pass
+
+    return 'success'
+
 ###############################################################################
 
 
@@ -397,6 +411,7 @@ gdaltest_list = [
     ogr_gpkg_6,
     ogr_gpkg_7,
     ogr_gpkg_8,
+    ogr_gpkg_cleanup,
 ]
 
 if __name__ == '__main__':
