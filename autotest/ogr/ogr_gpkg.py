@@ -392,6 +392,8 @@ def ogr_gpkg_8():
 
 def ogr_gpkg_cleanup():
 
+    gdaltest.gpkg_ds.Destroy()
+
     try:
         os.remove( 'tmp/gpkg_test.gpkg' )
     except:
