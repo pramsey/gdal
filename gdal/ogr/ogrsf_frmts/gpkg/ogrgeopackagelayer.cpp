@@ -1174,7 +1174,7 @@ OGRErr OGRGeoPackageLayer::RollbackTransaction()
 
 
 /************************************************************************/
-/*                        RollbackTransaction()                         */
+/*                        GetFeatureCount()                             */
 /************************************************************************/
 
 int OGRGeoPackageLayer::GetFeatureCount( int bForce )
