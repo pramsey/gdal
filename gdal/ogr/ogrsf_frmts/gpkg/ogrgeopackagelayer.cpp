@@ -1144,7 +1144,7 @@ OGRErr OGRGeoPackageLayer::SyncToDisk()
 }
 
 /************************************************************************/
-/*                        StartTransaction()                                  */
+/*                        StartTransaction()                            */
 /************************************************************************/
 
 OGRErr OGRGeoPackageLayer::StartTransaction()
@@ -1154,7 +1154,7 @@ OGRErr OGRGeoPackageLayer::StartTransaction()
 
 
 /************************************************************************/
-/*                        CommitTransaction()                                  */
+/*                        CommitTransaction()                           */
 /************************************************************************/
 
 OGRErr OGRGeoPackageLayer::CommitTransaction()
@@ -1164,12 +1164,34 @@ OGRErr OGRGeoPackageLayer::CommitTransaction()
 
 
 /************************************************************************/
-/*                        RollbackTransaction()                                  */
+/*                        RollbackTransaction()                         */
 /************************************************************************/
 
 OGRErr OGRGeoPackageLayer::RollbackTransaction()
 {
     return SQLCommand(m_poDS->GetDatabaseHandle(), "ROLLBACK");
+}
+
+
+/************************************************************************/
+/*                        RollbackTransaction()                         */
+/************************************************************************/
+
+int OGRGeoPackageLayer::GetFeatureCount( int bForce )
+{
+    /* Ignore bForce, because we always do a full count on the database */
+    OGRErr err;
+    CPLString soSQL;
+    soSQL.Printf("SELECT Count(*) FROM %s", m_pszTableName);
+
+    /* Just run the query directly and get back integer */
+    int iFeatureCount = SQLGetInteger(m_poDS->GetDatabaseHandle(), soSQL.c_str(), &err);
+
+    /* Generic implementation uses -1 for error condition, so we will too */
+    if ( err == OGRERR_NONE )
+        return iFeatureCount;
+    else
+        return -1;
 }
 
 

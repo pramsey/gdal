@@ -153,9 +153,9 @@ class OGRGeoPackageLayer : public OGRLayer
     OGRErr              StartTransaction();
     OGRErr              CommitTransaction();
     OGRErr              RollbackTransaction();
+    int                 GetFeatureCount( int );
     
     // void                SetSpatialFilter( int iGeomField, OGRGeometry * poGeomIn );
-    // virtual int         GetFeatureCount( int );
     // virtual OGRErr      GetExtent(OGREnvelope *psExtent, int bForce = TRUE);
 
     OGRErr              ReadTableDefinition();
