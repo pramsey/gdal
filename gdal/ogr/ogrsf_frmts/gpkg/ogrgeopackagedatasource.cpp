@@ -37,15 +37,20 @@ bool OGRGeoPackageDataSource::CheckApplicationId(const char * pszFileName)
 {
     CPLAssert( m_poDb == NULL );
     
-    /* "GP10" */
+    /* "GP10" in ASCII bytes */
     static char aGpkgId[4] = {0x47, 0x50, 0x31, 0x30};
     static size_t szGpkgIdPos = 68;
     char aFileId[4];
 
-    /* application_id is 4 bytes at offset 68 in the header */
     VSILFILE *fp = VSIFOpenL( pszFileName, "rb" );
+
+    /* Should never happen (always called after existence check) but just in case */
+    if ( ! fp ) return FALSE;
+
+    /* application_id is 4 bytes at offset 68 in the header */
     VSIFSeekL(fp, szGpkgIdPos, SEEK_SET);
     VSIFReadL(aFileId, 4, 1, fp);
+
     VSIFCloseL(fp);
     
     for ( int i = 0; i < 4; i++ )
