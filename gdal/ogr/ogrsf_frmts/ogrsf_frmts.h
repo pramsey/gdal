@@ -451,6 +451,7 @@ void CPL_DLL RegisterOGRGeoPackage();
 void CPL_DLL RegisterOGRPDF();
 void CPL_DLL RegisterOGRWalk();
 void CPL_DLL RegisterOGRCartoDB();
+void CPL_DLL RegisterOGRSXF();
 CPL_C_END
 
 
