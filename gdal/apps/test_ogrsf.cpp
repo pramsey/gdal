@@ -57,7 +57,6 @@ static int TestOGRLayer( OGRDataSource * poDS, OGRLayer * poLayer, int bIsSQLLay
 static int TestInterleavedReading( const char* pszDataSource, char** papszLayers );
 static int TestDSErrorConditions( OGRDataSource * poDS );
 
-
 /************************************************************************/
 /*                                main()                                */
 /************************************************************************/
@@ -768,7 +767,7 @@ static int TestOGRLayerRandomRead( OGRLayer *poLayer )
 /*      Test feature 5.                                                 */
 /* -------------------------------------------------------------------- */
     poFeature = poLayer->GetFeature( papoFeatures[4]->GetFID() );
-    if( !poFeature->Equal( papoFeatures[4] ) )
+    if( poFeature == NULL || !poFeature->Equal( papoFeatures[4] ) )
     {
         bRet = FALSE;
         printf( "ERROR: Attempt to randomly read feature %ld appears to\n"
@@ -1119,15 +1118,25 @@ static int TestSpatialFilter( OGRLayer *poLayer, int iGeomField )
 
     poGeom->getEnvelope( &sEnvelope );
 
+    OGREnvelope sLayerExtent;
+    double epsilon = 10.0;
+    if( poLayer->TestCapability( OLCFastGetExtent ) &&
+        poLayer->GetExtent(iGeomField, &sLayerExtent) == OGRERR_NONE &&
+        sLayerExtent.MinX < sLayerExtent.MaxX &&
+        sLayerExtent.MinY < sLayerExtent.MaxY )
+    {
+        epsilon = MIN( sLayerExtent.MaxX - sLayerExtent.MinX, sLayerExtent.MaxY - sLayerExtent.MinY ) / 10.0;
+    }
+
 /* -------------------------------------------------------------------- */
 /*      Construct inclusive filter.                                     */
 /* -------------------------------------------------------------------- */
     
-    oRing.setPoint( 0, sEnvelope.MinX - 20.0, sEnvelope.MinY - 20.0 );
-    oRing.setPoint( 1, sEnvelope.MinX - 20.0, sEnvelope.MaxY + 10.0 );
-    oRing.setPoint( 2, sEnvelope.MaxX + 10.0, sEnvelope.MaxY + 10.0 );
-    oRing.setPoint( 3, sEnvelope.MaxX + 10.0, sEnvelope.MinY - 20.0 );
-    oRing.setPoint( 4, sEnvelope.MinX - 20.0, sEnvelope.MinY - 20.0 );
+    oRing.setPoint( 0, sEnvelope.MinX - 2 * epsilon, sEnvelope.MinY - 2 * epsilon );
+    oRing.setPoint( 1, sEnvelope.MinX - 2 * epsilon, sEnvelope.MaxY + 1 * epsilon );
+    oRing.setPoint( 2, sEnvelope.MaxX + 1 * epsilon, sEnvelope.MaxY + 1 * epsilon );
+    oRing.setPoint( 3, sEnvelope.MaxX + 1 * epsilon, sEnvelope.MinY - 2 * epsilon );
+    oRing.setPoint( 4, sEnvelope.MinX - 2 * epsilon, sEnvelope.MinY - 2 * epsilon );
     
     oInclusiveFilter.addRing( &oRing );
 
@@ -1165,11 +1174,11 @@ static int TestSpatialFilter( OGRLayer *poLayer, int iGeomField )
 /* -------------------------------------------------------------------- */
 /*      Construct exclusive filter.                                     */
 /* -------------------------------------------------------------------- */
-    oRing.setPoint( 0, sEnvelope.MinX - 20.0, sEnvelope.MinY - 20.0 );
-    oRing.setPoint( 1, sEnvelope.MinX - 10.0, sEnvelope.MinY - 20.0 );
-    oRing.setPoint( 2, sEnvelope.MinX - 10.0, sEnvelope.MinY - 10.0 );
-    oRing.setPoint( 3, sEnvelope.MinX - 20.0, sEnvelope.MinY - 10.0 );
-    oRing.setPoint( 4, sEnvelope.MinX - 20.0, sEnvelope.MinY - 20.0 );
+    oRing.setPoint( 0, sEnvelope.MinX - 2 * epsilon, sEnvelope.MinY - 2 * epsilon );
+    oRing.setPoint( 1, sEnvelope.MinX - 1 * epsilon, sEnvelope.MinY - 2 * epsilon );
+    oRing.setPoint( 2, sEnvelope.MinX - 1 * epsilon, sEnvelope.MinY - 1 * epsilon );
+    oRing.setPoint( 3, sEnvelope.MinX - 2 * epsilon, sEnvelope.MinY - 1 * epsilon );
+    oRing.setPoint( 4, sEnvelope.MinX - 2 * epsilon, sEnvelope.MinY - 2 * epsilon );
     
     oExclusiveFilter.addRing( &oRing );
 

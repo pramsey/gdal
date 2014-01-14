@@ -684,7 +684,7 @@ OGRErr OGRSXFDataSource::ReadSXFMapDescription(VSILFILE* fpSXF, SXFPassport& pas
     else if (iEllips == 9 && iProjSys == 17) // WGS84 / UTM
     {
         double dfCenterLongEnv = passport.stMapDescription.stGeoCoords[1] + fabs(passport.stMapDescription.stGeoCoords[5] - passport.stMapDescription.stGeoCoords[1]) / 2;
-        int nZoneEnv = (dfCenterLongEnv + 3.0) / 6.0 + 0.5;
+        int nZoneEnv = 30 + (dfCenterLongEnv + 3.0) / 6.0 + 0.5;
         bool bNorth = passport.stMapDescription.stGeoCoords[6] + (passport.stMapDescription.stGeoCoords[2] - passport.stMapDescription.stGeoCoords[6]) / 2 < 0;
         int nEPSG;
         if (bNorth)
@@ -779,27 +779,33 @@ void OGRSXFDataSource::FillLayers()
             return;
         }
 
-	bool bIsSupported = oSXFPassport.version == 3 || !CHECK_BIT(buff[5], 2); 
-	if(bIsSupported)
-	{
-		bool bHasSemantic = CHECK_BIT(buff[5], 9);
-		if (bHasSemantic) //check has attributes
-		{
-		    //we have already 24 byte readed
-		    nOffsetSemantic = 8 + buff[2];
-		    VSIFSeekL(fpSXF, nOffsetSemantic, SEEK_CUR);
-		}
+        bool bIsSupported = oSXFPassport.version == 3 || !CHECK_BIT(buff[5], 2); 
+        if(bIsSupported)
+        {
+            bool bHasSemantic = CHECK_BIT(buff[5], 9);
+            if (bHasSemantic) //check has attributes
+            {
+                //we have already 24 byte readed
+                nOffsetSemantic = 8 + buff[2];
+                VSIFSeekL(fpSXF, nOffsetSemantic, SEEK_CUR);
+            }
 
-		int nSemanticSize = buff[1] - 32 - buff[2];
-		for (i = 0; i < nLayers; i++)
-		{
-		    OGRSXFLayer* pOGRSXFLayer = (OGRSXFLayer*)papoLayers[i];
-		    if (pOGRSXFLayer && pOGRSXFLayer->AddRecord(nFID, buff[3], nOffset, bHasSemantic, nSemanticSize) == TRUE)
-		    {
-		        break;
-		    }
-		}
-	}
+            int nSemanticSize = buff[1] - 32 - buff[2];
+            if( nSemanticSize < 0 )
+            {
+                CPLError(CE_Failure, CPLE_AppDefined, "Invalid value");
+                break;
+            }
+            for (i = 0; i < nLayers; i++)
+            {
+                OGRSXFLayer* pOGRSXFLayer = (OGRSXFLayer*)papoLayers[i];
+                if (pOGRSXFLayer && pOGRSXFLayer->AddRecord(nFID, buff[3], nOffset, bHasSemantic, nSemanticSize) == TRUE)
+                {
+                    break;
+                }
+            }
+        }
+
         nOffset += buff[1];
         VSIFSeekL(fpSXF, nOffset, SEEK_SET);
     }
@@ -1139,12 +1145,24 @@ void OGRSXFDataSource::CreateLayers(VSILFILE* fpRSC)
         char* pszRecoded;
         if (bLayerFullName)
         {
-            pszRecoded = CPLRecode(LAYER.szName, "CP1251", CPL_ENC_UTF8);
+            if (stRSCFileHeader.nFontEnc == 125)
+                pszRecoded = CPLRecode(LAYER.szName, "KOI8-R", CPL_ENC_UTF8);
+            else if (stRSCFileHeader.nFontEnc == 126)
+                pszRecoded = CPLRecode(LAYER.szName, "CP1251", CPL_ENC_UTF8);
+            else
+                pszRecoded = CPLStrdup(LAYER.szName);
+
             papoLayers[nLayers] = new OGRSXFLayer(fpSXF, &hIOMutex, LAYER.nNo, CPLString(pszRecoded), oSXFPassport.version, oSXFPassport.stMapDescription);
         }
         else
         {
-            pszRecoded = CPLRecode(LAYER.szShortName, "CP1251", CPL_ENC_UTF8);
+            if (stRSCFileHeader.nFontEnc == 125)
+                pszRecoded = CPLRecode(LAYER.szName, "KOI8-R", CPL_ENC_UTF8);
+            else if (stRSCFileHeader.nFontEnc == 126)
+                pszRecoded = CPLRecode(LAYER.szName, "CP1251", CPL_ENC_UTF8);
+            else
+                pszRecoded = CPLStrdup(LAYER.szName);
+
             papoLayers[nLayers] = new OGRSXFLayer(fpSXF, &hIOMutex, LAYER.nNo, CPLString(pszRecoded), oSXFPassport.version, oSXFPassport.stMapDescription);
         }
         CPLFree(pszRecoded);
@@ -1184,8 +1202,16 @@ void OGRSXFDataSource::CreateLayers(VSILFILE* fpRSC)
         OGRSXFLayer* pLayer = GetLayerById(OBJECT.szLayernNo);
         if (NULL != pLayer)
         {
-            pLayer->AddClassifyCode(OBJECT.nClassifyCode, OBJECT.szName);
+            char* pszRecoded;
+            if (stRSCFileHeader.nFontEnc == 125)
+                pszRecoded = CPLRecode(OBJECT.szName, "KOI8-R", CPL_ENC_UTF8);
+            else if (stRSCFileHeader.nFontEnc == 126)
+                pszRecoded = CPLRecode(OBJECT.szName, "CP1251", CPL_ENC_UTF8);
+            else
+                pszRecoded = CPLStrdup(OBJECT.szName); //already in  CPL_ENC_UTF8
+            pLayer->AddClassifyCode(OBJECT.nClassifyCode, pszRecoded);
             //printf("%d;%s\n", OBJECT.nClassifyCode, OBJECT.szName);
+            CPLFree(pszRecoded);
         }
 
         nOffset += OBJECT.nLength;

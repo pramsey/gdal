@@ -163,6 +163,9 @@ FGdbLayer::~FGdbLayer()
         OGRGeometryFactory::destroyGeometry(m_pOGRFilterGeometry);
         m_pOGRFilterGeometry = NULL;
     }
+    
+    for(size_t i = 0; i < m_apoByteArrays.size(); i++ )
+        delete m_apoByteArrays[i];
 
     CSLDestroy(m_papszOptions);
 }
@@ -425,6 +428,7 @@ OGRErr FGdbLayer::PopulateRowWithFeature( Row& fgdb_row, OGRFeature *poFeature )
     int nFieldCount = poFeatureDefn->GetFieldCount();
 
     /* Copy the OGR visible fields (everything except geometry and FID) */
+    int nCountBinaryField = 0;
     for( int i = 0; i < nFieldCount; i++ )
     {
         std::string field_name = poFeatureDefn->GetFieldDefn(i)->GetNameRef();
@@ -527,20 +531,23 @@ OGRErr FGdbLayer::PopulateRowWithFeature( Row& fgdb_row, OGRFeature *poFeature )
         else if ( nOGRFieldType == OFTBinary )
         {
             /* Binary data */
-            ByteArray fgdb_bytearray;
             int bytesize;
             GByte *bytes = poFeature->GetFieldAsBinary(i, &bytesize);
             if ( bytesize )
             {
-                fgdb_bytearray.Allocate(bytesize);
-                memcpy(fgdb_bytearray.byteArray, bytes, bytesize);
-                fgdb_bytearray.inUseLength = bytesize;
-                hr = fgdb_row.SetBinary(wfield_name, fgdb_bytearray);
+                /* This is annoying but SetBinary() doesn't keep the binary */
+                /* content. The ByteArray object must still be alive at */
+                /* the time Insert() is called */
+                m_apoByteArrays[nCountBinaryField]->Allocate(bytesize);
+                memcpy(m_apoByteArrays[nCountBinaryField]->byteArray, bytes, bytesize);
+                m_apoByteArrays[nCountBinaryField]->inUseLength = bytesize;
+                hr = fgdb_row.SetBinary(wfield_name, *(m_apoByteArrays[nCountBinaryField]));
             }
             else
             {
                 hr = fgdb_row.SetNull(wfield_name);
             }
+            nCountBinaryField ++;
         }
         else
         {
@@ -884,6 +891,9 @@ OGRErr FGdbLayer::CreateField(OGRFieldDefn* poField, int bApproxOK)
 
     m_vOGRFieldToESRIField.push_back(StringToWString(fieldname_clean));
     m_vOGRFieldToESRIFieldType.push_back( gdbFieldType );
+    
+    if( oField.GetType() == OFTBinary )
+        m_apoByteArrays.push_back(new ByteArray());
 
     /* All done and happy */
     return OGRERR_NONE;
@@ -1942,6 +1952,8 @@ bool FGdbLayer::GDBToOGRFields(CPLXMLNode* psRoot)
 
             m_vOGRFieldToESRIField.push_back(StringToWString(fieldName));
             m_vOGRFieldToESRIFieldType.push_back( fieldType );
+            if( ogrType == OFTBinary )
+                m_apoByteArrays.push_back(new ByteArray());
 
         }
     }
@@ -2259,22 +2271,20 @@ bool FGdbBaseLayer::OGRFeatureFromGdbRow(Row* pRow, OGRFeature** ppFeature)
             }
             break;
 
-            /* TODO: Need to get test dataset to implement these leave it as NULL for now
             case OFTBinary:
             {
                 ByteArray binaryBuf;
 
                 if (FAILED(hr = pRow->GetBinary(wstrFieldName, binaryBuf)))
-                {
-                GDBErr(hr, "Failed to determine binary value for column " + WStringToString(wstrFieldName));
-                foundBadColumn = true;
-                continue;
+                    {
+                    GDBErr(hr, "Failed to determine binary value for column " + WStringToString(wstrFieldName));
+                    foundBadColumn = true;
+                    continue;
                 }
 
                 pOutFeature->SetField(i, (int)binaryBuf.inUseLength, (GByte*)binaryBuf.byteArray);
             }
             break;
-            */
 
             case OFTDateTime:
             {
