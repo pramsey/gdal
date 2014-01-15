@@ -80,6 +80,9 @@ def ogr_gpkg_1():
 
 def ogr_gpkg_2():
 
+    if gdaltest.gpkg_dr is None: 
+        return 'skip'
+
     gdaltest.gpkg_ds = gdaltest.gpkg_dr.Open( 'tmp/gpkg_test.gpkg' )
 
     if gdaltest.gpkg_ds is not None:
@@ -93,7 +96,7 @@ def ogr_gpkg_2():
 
 def ogr_gpkg_3():
 
-    if gdaltest.gpkg_ds is None:
+    if gdaltest.gpkg_dr is None or gdaltest.gpkg_ds is None:
         return 'skip'
 
     # Test invalid FORMAT
@@ -121,7 +124,7 @@ def ogr_gpkg_3():
 
 def ogr_gpkg_4():
 
-    if gdaltest.gpkg_ds is None:
+    if gdaltest.gpkg_dr is None or gdaltest.gpkg_ds is None:
         return 'skip'
 
     gdaltest.gpkg_ds.Destroy()
@@ -156,7 +159,7 @@ def ogr_gpkg_4():
 
 def ogr_gpkg_5():
 
-    if gdaltest.gpkg_ds is None:
+    if gdaltest.gpkg_dr is None or gdaltest.gpkg_ds is None:
         return 'skip'
 
     if gdaltest.gpkg_ds.GetLayerCount() != 2:
@@ -183,7 +186,7 @@ def ogr_gpkg_5():
 
 def ogr_gpkg_6():
 
-    if gdaltest.gpkg_ds is None:
+    if gdaltest.gpkg_dr is None or gdaltest.gpkg_ds is None:
         return 'skip'
 
     srs4326 = osr.SpatialReference()
@@ -231,6 +234,9 @@ def ogr_gpkg_6():
 # Add a feature / read a feature / delete a feature
 
 def ogr_gpkg_7():
+
+    if gdaltest.gpkg_dr is None or gdaltest.gpkg_ds is None:
+        return 'skip'
 
     lyr = gdaltest.gpkg_ds.GetLayerByName('field_test_layer')
     geom = ogr.CreateGeometryFromWkt('POINT(10 10)')
@@ -302,7 +308,7 @@ def ogr_gpkg_8():
     # gdaltest.gpkg_dr = ogr.GetDriverByName( 'GPKG' )
     # gdaltest.gpkg_ds = gdaltest.gpkg_dr.CreateDataSource( 'tmp/gpkg_test.gpkg' )
 
-    if gdaltest.gpkg_ds is None:
+    if gdaltest.gpkg_dr is None or gdaltest.gpkg_ds is None:
         return 'skip'
 
     srs = osr.SpatialReference()
@@ -391,6 +397,9 @@ def ogr_gpkg_8():
 # Remove the test db from the tmp directory
 
 def ogr_gpkg_cleanup():
+
+    if gdaltest.gpkg_dr is None or gdaltest.gpkg_ds is None:
+        return 'skip'
 
     gdaltest.gpkg_ds.Destroy()
 

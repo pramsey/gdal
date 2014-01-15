@@ -74,13 +74,6 @@ class OGRGeoPackageDataSource : public OGRDataSource
     sqlite3*            m_poDb;
     
     
-/*
-    int                 bReadWrite;
-    int                 bUseHTTPS;
-    int                 bMustCleanPersistant;
-    int                 FetchSRSId( OGRSpatialReference * poSRS );
-*/
-
     public:
                             OGRGeoPackageDataSource();
                             ~OGRGeoPackageDataSource();
@@ -112,29 +105,7 @@ class OGRGeoPackageDataSource : public OGRDataSource
         OGRErr              PragmaCheck(const char * pszPragma, const char * pszExpected, int nRowsExpected);
         bool                CheckApplicationId(const char * pszFileName);
         OGRErr              SetApplicationId();
-
     
-/*
-    virtual OGRLayer*   GetLayer( int );
-
-    virtual OGRLayer    *GetLayerByName(const char *);
-
-
-    virtual OGRLayer   *CreateLayer( const char *pszName,
-                                     OGRSpatialReference *poSpatialRef = NULL,
-                                     OGRwkbGeometryType eGType = wkbUnknown,
-                                     char ** papszOptions = NULL );
-
-    virtual OGRErr      DeleteLayer(int);
-
-    virtual OGRLayer*   ExecuteSQL( const char *pszSQLCommand,
-                                    OGRGeometry *poSpatialFilter,
-                                    const char *pszDialect );
-                                    
-    virtual void        ReleaseResultSet( OGRLayer * poLayer );
-
-    int                 IsReadWrite() const { return bReadWrite; }
-*/
 };
 
 
@@ -182,6 +153,8 @@ class OGRGeoPackageLayer : public OGRLayer
     OGRErr              StartTransaction();
     OGRErr              CommitTransaction();
     OGRErr              RollbackTransaction();
+    int                 GetFeatureCount( int );
+    OGRErr              GetExtent(OGREnvelope *psExtent, int bForce = TRUE);
     
     // void                SetSpatialFilter( int iGeomField, OGRGeometry * poGeomIn );
 
@@ -203,28 +176,6 @@ class OGRGeoPackageLayer : public OGRLayer
     OGRErr              FeatureBindInsertParameters( OGRFeature *poFeature, sqlite3_stmt *poStmt );
     OGRErr              FeatureBindParameters( OGRFeature *poFeature, sqlite3_stmt *poStmt, int *pnColCount );
     OGRErr              GetLastFid( int *pnFid );
-
-/*    
-    virtual OGRErr      SetFeature( OGRFeature *poFeature );
-
-
-
-    virtual OGRFeature *GetFeature( long nFeatureId );
-    virtual int         GetFeatureCount( int );
-
-    virtual void        SetSpatialFilter( OGRGeometry *poGeom ) { SetSpatialFilter(0, poGeom); }
-    virtual void        SetSpatialFilter( int iGeomField, OGRGeometry *poGeom );
-
-    virtual OGRErr      SetAttributeFilter( const char * );
-
-    virtual OGRErr      DeleteFeature( long nFID );
-    virtual OGRErr      CreateFeature( OGRFeature *poFeature );
-
-                                     int bApproxOK = TRUE );
-    virtual OGRErr      CreateGeomField( OGRGeomFieldDefn *poGeomField,
-    virtual OGRErr      DeleteField( int iField );
-    virtual OGRErr      AlterFieldDefn( int iField, OGRFieldDefn* poNewFieldDefn, int nFlags );
-*/
 
 };
 
