@@ -154,9 +154,9 @@ class OGRGeoPackageLayer : public OGRLayer
     OGRErr              CommitTransaction();
     OGRErr              RollbackTransaction();
     int                 GetFeatureCount( int );
+    OGRErr              GetExtent(OGREnvelope *psExtent, int bForce = TRUE);
     
     // void                SetSpatialFilter( int iGeomField, OGRGeometry * poGeomIn );
-    // virtual OGRErr      GetExtent(OGREnvelope *psExtent, int bForce = TRUE);
 
     OGRErr              ReadTableDefinition();
 
@@ -176,7 +176,6 @@ class OGRGeoPackageLayer : public OGRLayer
     OGRErr              FeatureBindInsertParameters( OGRFeature *poFeature, sqlite3_stmt *poStmt );
     OGRErr              FeatureBindParameters( OGRFeature *poFeature, sqlite3_stmt *poStmt, int *pnColCount );
     OGRErr              GetLastFid( int *pnFid );
-
 
 };
 

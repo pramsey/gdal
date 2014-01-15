@@ -197,6 +197,8 @@ OGRErr OGRGeoPackageLayer::ReadFeature( sqlite3_stmt *poQuery, OGRFeature **ppoF
     return OGRERR_NONE;
 }
 
+
+
 OGRErr OGRGeoPackageLayer::GetLastFid( int *pnFid )
 {
     int err;
@@ -491,6 +493,7 @@ OGRErr OGRGeoPackageLayer::ReadTableDefinition()
     SQLResult oResultContents;
     SQLResult oResultGeomCols;
     char* pszSQL;
+    OGRBoolean bReadExtent = FALSE;
     sqlite3* poDb = m_poDS->GetDatabaseHandle();
 
     /* Check that the table name is registered in gpkg_contents */
@@ -518,6 +521,7 @@ OGRErr OGRGeoPackageLayer::ReadTableDefinition()
         oExtent.MinY = atof(pszMinY);
         oExtent.MaxX = atof(pszMaxX);
         oExtent.MaxY = atof(pszMaxY);
+        bReadExtent = TRUE;
     }
 
     /* gpkg_contents query has to work */
@@ -668,7 +672,10 @@ OGRErr OGRGeoPackageLayer::ReadTableDefinition()
         
     }
 
-    m_poExtent = new OGREnvelope(oExtent);
+    if ( bReadExtent )
+    {
+        m_poExtent = new OGREnvelope(oExtent);
+    }
 
     SQLResultFree(&oResultTable);
     SQLResultFree(&oResultGeomCols);
@@ -992,7 +999,7 @@ OGRFeature* OGRGeoPackageLayer::GetNextFeature()
             soSQL.Printf("SELECT %s FROM %s WHERE %s", m_soColumns.c_str(), m_pszTableName, m_soFilter.c_str());
         else
             soSQL.Printf("SELECT %s FROM %s ", m_soColumns.c_str(), m_pszTableName);
-        
+
         int err = sqlite3_prepare(m_poDS->GetDatabaseHandle(), soSQL.c_str(), -1, &m_poQueryStatement, NULL);
         if ( err != SQLITE_OK )
         {
@@ -1196,6 +1203,40 @@ int OGRGeoPackageLayer::GetFeatureCount( int bForce )
 
 
 /************************************************************************/
+/*                        GetExtent()                                   */
+/************************************************************************/
+
+OGRErr OGRGeoPackageLayer::GetExtent(OGREnvelope *psExtent, int bForce)
+{
+    /* Extent already calculated! We're done. */
+    if ( m_poExtent != NULL )
+    {
+        if ( psExtent )
+        {
+            *psExtent = *m_poExtent;            
+        }
+        return OGRERR_NONE;
+    }
+
+    /* User is OK with expensive calculation, fall back to */
+    /* default implementation (scan all features) and save */
+    /* the result for later */
+    if ( bForce )
+    {
+        OGRErr err = OGRLayer::GetExtent(psExtent, bForce);
+        if ( err != OGRERR_NONE )
+            return err;
+    
+        *m_poExtent = *psExtent;
+        return SaveExtent();
+    }
+
+    return OGRERR_FAILURE;
+}
+
+
+
+/************************************************************************/
 /*                      TestCapability()                                */
 /************************************************************************/
 
@@ -1213,6 +1254,13 @@ int OGRGeoPackageLayer::TestCapability ( const char * pszCap )
     else if ( EQUAL(pszCap, OLCStringsAsUTF8) )
     {
         return m_poDS->GetUTF8();
+    }
+    else if ( EQUAL(pszCap, OLCFastGetExtent) )
+    {
+        if ( m_poExtent && ! m_poFilterGeom )
+            return TRUE;
+        else
+            return FALSE;
     }
     else
     {
