@@ -508,10 +508,25 @@ OGRErr OGRGeoPackageLayer::ReadTableDefinition()
     err = SQLQuery(poDb, pszSQL, &oResultContents);
     sqlite3_free(pszSQL);
     
-    char *pszMinX = SQLResultGetValue(&oResultContents, 5, 0);
-    char *pszMinY = SQLResultGetValue(&oResultContents, 6, 0);
-    char *pszMaxX = SQLResultGetValue(&oResultContents, 7, 0);
-    char *pszMaxY = SQLResultGetValue(&oResultContents, 8, 0);
+    /* gpkg_contents query has to work */
+    /* gpkg_contents.table_name is supposed to be unique */
+    if ( err != OGRERR_NONE || oResultContents.nRowCount != 1 )
+    {
+        if ( err != OGRERR_NONE )
+            CPLError( CE_Failure, CPLE_AppDefined, "%s", oResultContents.pszErrMsg );
+        else if ( oResultContents.nRowCount != 1 )
+            CPLError( CE_Failure, CPLE_AppDefined, "layer '%s' is not registered in gpkg_contents", m_pszTableName );
+        else
+            CPLError( CE_Failure, CPLE_AppDefined, "error reading gpkg_contents" );
+            
+        SQLResultFree(&oResultContents);
+        return err;        
+    }
+
+    char *pszMinX = SQLResultGetValue(&oResultContents, 4, 0);
+    char *pszMinY = SQLResultGetValue(&oResultContents, 5, 0);
+    char *pszMaxX = SQLResultGetValue(&oResultContents, 6, 0);
+    char *pszMaxY = SQLResultGetValue(&oResultContents, 7, 0);
     
 	/* All the extrema have to be non-NULL for this to make sense */
     OGREnvelope oExtent;
@@ -524,22 +539,13 @@ OGRErr OGRGeoPackageLayer::ReadTableDefinition()
         bReadExtent = TRUE;
     }
 
-    /* gpkg_contents query has to work */
-    /* gpkg_contents.table_name is supposed to be unique */
-    if ( err != OGRERR_NONE || oResultContents.nRowCount != 1 )
-    {
-        CPLError( CE_Failure, CPLE_AppDefined, "%s", oResultContents.pszErrMsg );
-        SQLResultFree(&oResultContents);
-        return err;        
-    }
-
     /* Done with info from gpkg_contents now */
     SQLResultFree(&oResultContents);
 
     /* Check that the table name is registered in gpkg_geometry_columns */
     pszSQL = sqlite3_mprintf(
-                "SELECT table_name, column_name, geometry_type_name, "
-                "srs_id, z "
+                "SELECT table_name, column_name, "
+                "geometry_type_name, srs_id, z "
                 "FROM gpkg_geometry_columns "
                 "WHERE table_name = '%q'",
                 m_pszTableName);
@@ -576,9 +582,9 @@ OGRErr OGRGeoPackageLayer::ReadTableDefinition()
     m_poFeatureDefn = new OGRFeatureDefn( m_pszTableName );
     m_poFeatureDefn->Reference();
     
-    int bHasZ = SQLResultGetValueAsInteger(&oResultGeomCols, 4, 0);
-    int iSrsId = SQLResultGetValueAsInteger(&oResultGeomCols, 3, 0);
     char *pszGeomColsType = SQLResultGetValue(&oResultGeomCols, 2, 0);
+    int iSrsId = SQLResultGetValueAsInteger(&oResultGeomCols, 3, 0);
+    int bHasZ = SQLResultGetValueAsInteger(&oResultGeomCols, 4, 0);
     int iRecord;
     OGRBoolean bFidFound = FALSE;
     m_iSrs = iSrsId;

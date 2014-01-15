@@ -391,7 +391,28 @@ def ogr_gpkg_8():
     
     return 'success'
 
+###############################################################################
+# Test support for extents and counts
 
+def ogr_gpkg_9():
+
+    lyr = gdaltest.gpkg_ds.GetLayerByName('tbl_linestring')
+    extent = lyr.GetExtent()
+    if extent != (5.0, 10.0, 5.0, 10.0):
+        gdaltest.post_reason('got bad extent')
+        print(extent)
+        return 'fail'
+    
+    fcount = lyr.GetFeatureCount()
+    if fcount != 5:
+        gdaltest.post_reason('got bad featurecount')
+        print(fcount)
+        return 'fail'
+    
+    
+    return 'success'
+    
+    
 
 ###############################################################################
 # Remove the test db from the tmp directory
@@ -422,6 +443,7 @@ gdaltest_list = [
     ogr_gpkg_6,
     ogr_gpkg_7,
     ogr_gpkg_8,
+    ogr_gpkg_9,
     ogr_gpkg_cleanup,
 ]
 
