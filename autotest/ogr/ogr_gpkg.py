@@ -334,6 +334,7 @@ def ogr_gpkg_8():
         if lyr.CreateFeature(feat) != 0:
             gdaltest.post_reason('cannot create feature %d' % i)
             return 'fail'
+                        
     
     feat = ogr.Feature(lyr.GetLayerDefn())
     if lyr.CreateFeature(feat) != 0:
@@ -404,7 +405,7 @@ def ogr_gpkg_9():
         return 'fail'
     
     fcount = lyr.GetFeatureCount()
-    if fcount != 5:
+    if fcount != 11:
         gdaltest.post_reason('got bad featurecount')
         print(fcount)
         return 'fail'
