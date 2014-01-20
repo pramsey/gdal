@@ -745,8 +745,8 @@ OGRLayer* OGRGeoPackageDataSource::CreateLayer( const char * pszLayerName,
     {
         if( EQUAL(pszLayerName, m_papoLayers[iLayer]->GetName()) )
         {
-            if( CSLFetchNameValue( papszOptions, "OVERWRITE" ) != NULL &&
-                EQUAL(CSLFetchNameValue(papszOptions,"OVERWRITE"),"YES") )
+            const char *pszOverwrite = CSLFetchNameValue(papszOptions,"OVERWRITE");
+            if( pszOverwrite != NULL && CSLTestBoolean(pszOverwrite) )
             {
                 DeleteLayer( iLayer );
             }

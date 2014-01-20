@@ -18,9 +18,13 @@ The GeoPackage standard uses a SQLite database file as a generic container, and 
 </ul>
 <p>This driver reads and writes SQLite files from the file system, so it must be run by a user with read/write access to the files it is working with.</p>
 
-<h2>Opening a file</h2>
+<h2>Limitations</h2>
 
-<p>...</p>
+<ul>
+<li>GeoPackage only supports one geometry column per table.</li>
+<li>This driver does not currently implement the GeoPackage index extension.</li>
+<li>GeoPackage does not currently support non-spatial tables.</li>
+</ul>
 
 <h2>SQL</h2>
 
@@ -43,20 +47,12 @@ The GeoPackage standard uses a SQLite database file as a generic container, and 
 <h3>Layer Creation Options</h3>
 
 <ul>
-<li><b>something</b>: somethign tomsethign.</li>
+<li><b>GEOMETRY_COLUMN</b>: Column to use for the geometry column.</li>
+<li><b>FID</b>: Column name to use for the OGR FID (primary key in the SQLite database).</li>
+<li><b>OVERWRITE</b>: If set to "YES" will delete any existing layers that have the same name as the layer being created.</li>
+<li><b>SPATIAL_INDEX</b>: [NOT IMPLEMENTED] If set to "YES" will create a spatial index for this layer.</li>
+
 </ul>
-
-<!--
-
-<h3>Configuration Options</h3>
-
-<p>There are a variety of 
-<a href="http://trac.osgeo.org/gdal/wiki/ConfigOptions">Configuration 
-Options</a> which help control the behavior of this driver.</p>
-
-<ul><li></li></ul>
-
--->
 
 <h3>Examples</h3>
 
