@@ -48,7 +48,7 @@ ogrtest.openfilegdb_datalist = [ [ "none", ogr.wkbNone, None],
                 [ "linestring", ogr.wkbLineString, "LINESTRING (1 2,3 4)", "MULTILINESTRING ((1 2,3 4))" ],
                 [ "multilinestring", ogr.wkbMultiLineString, "MULTILINESTRING ((1 2,3 4))" ],
                 [ "polygon", ogr.wkbPolygon, "POLYGON ((0 0,0 1,1 1,1 0,0 0))", "MULTIPOLYGON (((0 0,0 1,1 1,1 0,0 0)))" ],
-                [ "multipolygon", ogr.wkbMultiPolygon, "MULTIPOLYGON (((0 0,0 1,1 1,1 0,0 0),(0.25 0.25,0.75 0.25,0.75 0.75,0.75 0.25,0.25 0.25)),((2 0,2 1,3 1,3 0,2 0)))" ],
+                [ "multipolygon", ogr.wkbMultiPolygon, "MULTIPOLYGON (((0 0,0 1,1 1,1 0,0 0),(0.25 0.25,0.75 0.25,0.75 0.75,0.25 0.75,0.25 0.25)),((2 0,2 1,3 1,3 0,2 0)))" ],
                 [ "point25D", ogr.wkbPoint25D, "POINT (1 2 3)" ],
                 [ "multipoint25D", ogr.wkbMultiPoint25D, "MULTIPOINT (1 2 -10,3 4 -20)" ],
                 [ "linestring25D", ogr.wkbLineString25D, "LINESTRING (1 2 -10,3 4 -20)", "MULTILINESTRING ((1 2 -10,3 4 -20))" ],
@@ -195,6 +195,20 @@ def ogr_openfilegdb_make_test_data():
             feat = ogr.Feature(lyr.GetLayerDefn())
             lyr.CreateFeature(feat)
             feat = None
+
+    if True:
+        lyr = ds.CreateLayer('several_polygons', geom_type = ogr.wkbPolygon, srs = None)
+        for i in range(3):
+            for j in range(3):
+                feat = ogr.Feature(lyr.GetLayerDefn())
+                x1 = 2 * i
+                x2 = 2 * i + 1
+                y1 = 2 * j
+                y2 = 2 * j + 1
+                geom = ogr.CreateGeometryFromWkt('POLYGON((%d %d,%d %d,%d %d,%d %d,%d %d))' % (x1,y1,x1,y2,x2,y2,x2,y1,x1,y1))
+                feat.SetGeometry(geom)
+                lyr.CreateFeature(feat)
+                feat = None
 
     for fld_name in [ 'id', 'str', 'smallint', 'int', 'float', 'real', 'adate', 'guid', 'nullint' ]:
         ds.ExecuteSQL('CREATE INDEX idx_%s ON point(%s)' % (fld_name, fld_name))
@@ -751,12 +765,377 @@ def ogr_openfilegdb_8():
     # looking at the structure of the .gdbtable
     expected_str = [ 'fid13', 'fid2', 'fid3', 'fid4', 'fid5', 'fid6', 'fid7', 'fid8', 'fid9', 'fid10', 'fid11', None ]
     i = 0
-    for feat in lyr:
+    feat = lyr.GetNextFeature()
+    while feat is not None:
         if feat.GetField('str') != expected_str[i]:
             feat.DumpReadable()
             return 'fail'
         i = i + 1
+        feat = lyr.GetNextFeature()
 
+    return 'success'
+
+###############################################################################
+# Test reading a .gdbtable outside a .gdb
+
+def ogr_openfilegdb_9():
+
+    try:
+        os.stat('tmp/testopenfilegdb.gdb')
+    except:
+        return 'skip'
+ 
+    shutil.copy('tmp/testopenfilegdb.gdb/a00000009.gdbtable', 'tmp/a00000009.gdbtable')
+    shutil.copy('tmp/testopenfilegdb.gdb/a00000009.gdbtablx', 'tmp/a00000009.gdbtablx')
+    ds = ogr.Open('tmp/a00000009.gdbtable')
+    if ds is None:
+        return 'fail'
+    lyr = ds.GetLayer(0)
+    feat = lyr.GetNextFeature()
+    if feat is None:
+        return 'fail'
+
+    return 'success'
+
+###############################################################################
+# Test various error conditions
+
+def fuzz(filename, offset):
+    f = open(filename, "rb+")
+    f.seek(offset, 0)
+    v = ord(f.read(1))
+    f.seek(offset, 0)
+    import sys
+    if sys.version_info >= (3,0,0):
+        f.write(('%c' % (255 - v)).encode('ISO-8859-1'))
+    else:
+        f.write('%c' % (255 - v))
+    f.close()
+    return (filename, offset, v)
+
+def unfuzz(backup):
+    (filename, offset, v) = backup
+    f = open(filename, "rb+")
+    f.seek(offset, 0)
+    import sys
+    if sys.version_info >= (3,0,0):
+        f.write(('%c' % (v)).encode('ISO-8859-1'))
+    else:
+        f.write('%c' % (v))
+    f.close()
+
+def ogr_openfilegdb_10():
+
+    try:
+        os.stat('tmp/testopenfilegdb.gdb')
+    except:
+        return 'skip'
+ 
+    shutil.copytree('tmp/testopenfilegdb.gdb', 'tmp/testopenfilegdb_fuzzed.gdb')
+
+    if False:
+        for filename in ['tmp/testopenfilegdb_fuzzed.gdb/a00000001.gdbtable',
+                        'tmp/testopenfilegdb_fuzzed.gdb/a00000001.gdbtablx']:
+            errors = set()
+            offsets = []
+            last_error_msg = ''
+            last_offset = -1
+            for offset in range(os.stat(filename).st_size):
+                #print(offset)
+                backup = fuzz(filename, offset)
+                gdal.ErrorReset()
+                print(offset)
+                ds = ogr.Open('tmp/testopenfilegdb_fuzzed.gdb')
+                error_msg = gdal.GetLastErrorMsg()
+                feat = None
+                if ds is not None:
+                    gdal.ErrorReset()
+                    lyr = ds.GetLayerByName('GDB_SystemCatalog')
+                    if error_msg == '':
+                        error_msg = gdal.GetLastErrorMsg()
+                    if lyr is not None:
+                        gdal.ErrorReset()
+                        feat = lyr.GetNextFeature()
+                        if error_msg == '':
+                            error_msg = gdal.GetLastErrorMsg()
+                if feat is None or error_msg != '':
+                    if offset - last_offset >= 4 or last_error_msg != error_msg:
+                        if error_msg != '' and not error_msg in errors:
+                            errors.add(error_msg)
+                            offsets.append(offset)
+                        else:
+                            offsets.append(offset)
+                    last_offset = offset
+                    last_error_msg = error_msg
+                ds = None
+                unfuzz(backup)
+            print(offsets)
+
+        for filename in ['tmp/testopenfilegdb_fuzzed.gdb/a00000004.gdbindexes',
+                         'tmp/testopenfilegdb_fuzzed.gdb/a00000004.CatItemsByPhysicalName.atx']:
+            errors = set()
+            offsets = []
+            last_error_msg = ''
+            last_offset = -1
+            for offset in range(os.stat(filename).st_size):
+                #print(offset)
+                backup = fuzz(filename, offset)
+                gdal.ErrorReset()
+                print(offset)
+                ds = ogr.Open('tmp/testopenfilegdb_fuzzed.gdb')
+                error_msg = gdal.GetLastErrorMsg()
+                feat = None
+                if ds is not None:
+                    gdal.ErrorReset()
+                    lyr = ds.GetLayerByName('GDB_Items')
+                    lyr.SetAttributeFilter("PhysicalName = 'NO_FIELD'")
+                    if error_msg == '':
+                        error_msg = gdal.GetLastErrorMsg()
+                    if lyr is not None:
+                        gdal.ErrorReset()
+                        feat = lyr.GetNextFeature()
+                        if error_msg == '':
+                            error_msg = gdal.GetLastErrorMsg()
+                if feat is None or error_msg != '':
+                    if offset - last_offset >= 4 or last_error_msg != error_msg:
+                        if error_msg != '' and not error_msg in errors:
+                            errors.add(error_msg)
+                            offsets.append(offset)
+                        else:
+                            offsets.append(offset)
+                    last_offset = offset
+                    last_error_msg = error_msg
+                ds = None
+                unfuzz(backup)
+            print(offsets)
+
+    else:
+
+        for (filename, offsets) in [ ('tmp/testopenfilegdb_fuzzed.gdb/a00000001.gdbtable', [4, 7, 32, 33, 41, 42, 52, 59, 60, 63, 64, 72, 73, 77, 78, 79, 80, 81, 101, 102, 104, 105, 111, 180]),
+                          ('tmp/testopenfilegdb_fuzzed.gdb/a00000001.gdbtablx', [4, 7, 11, 16, 31, 5136, 5140, 5142, 5144])]:
+            for offset in offsets:
+                backup = fuzz(filename, offset)
+                gdal.PushErrorHandler('CPLQuietErrorHandler')
+                gdal.ErrorReset()
+                ds = ogr.Open('tmp/testopenfilegdb_fuzzed.gdb')
+                error_msg = gdal.GetLastErrorMsg()
+                feat = None
+                if ds is not None:
+                    gdal.ErrorReset()
+                    lyr = ds.GetLayerByName('GDB_SystemCatalog')
+                    if error_msg == '':
+                        error_msg = gdal.GetLastErrorMsg()
+                    if lyr is not None:
+                        gdal.ErrorReset()
+                        feat = lyr.GetNextFeature()
+                        if error_msg == '':
+                            error_msg = gdal.GetLastErrorMsg()
+                if feat is not None and error_msg == '':
+                    print('%s: expected problem at offset %d, but did not find' % (filename, offset))
+                ds = None
+                gdal.PopErrorHandler()
+                unfuzz(backup)
+
+        for (filename, offsets) in [ ('tmp/testopenfilegdb_fuzzed.gdb/a00000004.gdbindexes', [0, 4, 5, 44, 45, 66, 67, 100, 101, 116, 117, 148, 149, 162, 163, 206, 207, 220, 221, 224, 280, 281]),
+                          ('tmp/testopenfilegdb_fuzzed.gdb/a00000004.CatItemsByPhysicalName.atx', [4, 68, 108, 268, 428, 588, 748, 908, 1068, 1228, 1388, 1548, 1708, 1868, 2028, 2188, 2348, 4096, 4098, 4102, 4106]) ]:
+            for offset in offsets:
+                #print(offset)
+                backup = fuzz(filename, offset)
+                gdal.PushErrorHandler('CPLQuietErrorHandler')
+                gdal.ErrorReset()
+                ds = ogr.Open('tmp/testopenfilegdb_fuzzed.gdb')
+                error_msg = gdal.GetLastErrorMsg()
+                feat = None
+                if ds is not None:
+                    gdal.ErrorReset()
+                    lyr = ds.GetLayerByName('GDB_Items')
+                    lyr.SetAttributeFilter("PhysicalName = 'NO_FIELD'")
+                    if error_msg == '':
+                        error_msg = gdal.GetLastErrorMsg()
+                    if lyr is not None:
+                        gdal.ErrorReset()
+                        feat = lyr.GetNextFeature()
+                        if error_msg == '':
+                            error_msg = gdal.GetLastErrorMsg()
+                if feat is not None and error_msg == '':
+                    print('%s: expected problem at offset %d, but did not find' % (filename, offset))
+                ds = None
+                gdal.PopErrorHandler()
+                unfuzz(backup)
+
+    return 'success'
+
+###############################################################################
+# Test spatial filtering
+
+SPI_IN_BUILDING = 0
+SPI_COMPLETED = 1
+SPI_INVALID = 2
+
+def get_spi_state(ds, lyr):
+    sql_lyr = ds.ExecuteSQL('GetLayerSpatialIndexState %s' % lyr.GetName())
+    value = int(sql_lyr.GetNextFeature().GetField(0))
+    ds.ReleaseResultSet(sql_lyr)
+    return value
+
+def ogr_openfilegdb_11():
+
+    # Test building spatial index with GetFeatureCount()
+    ds = ogr.Open('data/testopenfilegdb.gdb.zip')
+    lyr = ds.GetLayerByName('several_polygons')
+    if get_spi_state(ds, lyr) != SPI_IN_BUILDING:
+        gdaltest.post_reason('failure')
+        return 'fail'
+    lyr.ResetReading()
+    if get_spi_state(ds, lyr) != SPI_IN_BUILDING:
+        gdaltest.post_reason('failure')
+        return 'fail'
+    if lyr.TestCapability(ogr.OLCFastFeatureCount) != 1:
+        gdaltest.post_reason('failure')
+        return 'fail'
+    lyr.SetSpatialFilterRect(0.25,0.25,0.5,0.5)
+    if lyr.GetFeatureCount() != 1:
+        gdaltest.post_reason('failure')
+        return 'fail'
+    if get_spi_state(ds, lyr) != SPI_COMPLETED:
+        gdaltest.post_reason('failure')
+        return 'fail'
+    # Should return cached value
+    if lyr.GetFeatureCount() != 1:
+        gdaltest.post_reason('failure')
+        return 'fail'
+    # Should use index
+    c = 0
+    feat = lyr.GetNextFeature()
+    while feat is not None:
+        c = c + 1
+        feat = lyr.GetNextFeature()
+    if c != 1:
+        gdaltest.post_reason('failure')
+        return 'fail'
+    feat = None
+    lyr = None
+    ds = None
+
+    # Test iterating without spatial index already built
+    ds = ogr.Open('data/testopenfilegdb.gdb.zip')
+    lyr = ds.GetLayerByName('several_polygons')
+    lyr.SetSpatialFilterRect(0.25,0.25,0.5,0.5)
+    c = 0
+    feat = lyr.GetNextFeature()
+    if get_spi_state(ds, lyr) != SPI_IN_BUILDING:
+        gdaltest.post_reason('failure')
+        return 'fail'
+    while feat is not None:
+        c = c + 1
+        feat = lyr.GetNextFeature()
+    if c != 1:
+        gdaltest.post_reason('failure')
+        return 'fail'
+    if get_spi_state(ds, lyr) != SPI_COMPLETED:
+        gdaltest.post_reason('failure')
+        return 'fail'
+    feat = None
+    lyr = None
+    ds = None
+    
+    # Test GetFeatureCount() without spatial index already built, with no matching feature
+    # when GEOS is available
+    if ogrtest.have_geos():
+        expected_count = 0
+    else:
+        expected_count = 5
+
+    ds = ogr.Open('data/testopenfilegdb.gdb.zip')
+    lyr = ds.GetLayerByName('multipolygon')
+    lyr.SetSpatialFilterRect(1.4,0.4,1.6,0.6)
+    if lyr.GetFeatureCount() != expected_count:
+        gdaltest.post_reason('failure')
+        return 'fail'
+    lyr = None
+    ds = None
+
+    # Test iterating without spatial index already built, with no matching feature
+    # when GEOS is available
+    ds = ogr.Open('data/testopenfilegdb.gdb.zip')
+    lyr = ds.GetLayerByName('multipolygon')
+    lyr.SetSpatialFilterRect(1.4,0.4,1.6,0.6)
+    c = 0
+    feat = lyr.GetNextFeature()
+    while feat is not None:
+        c = c + 1
+        feat = lyr.GetNextFeature()
+    if c != expected_count:
+        gdaltest.post_reason('failure')
+        return 'fail'
+    if lyr.GetFeatureCount() != expected_count:
+        gdaltest.post_reason('failure')
+        return 'fail'
+    feat = None
+    lyr = None
+    ds = None
+
+    # GetFeature() should not impact spatial index building
+    ds = ogr.Open('data/testopenfilegdb.gdb.zip')
+    lyr = ds.GetLayerByName('several_polygons')
+    lyr.SetSpatialFilterRect(0.25,0.25,0.5,0.5)
+    feat = lyr.GetFeature(1)
+    feat = lyr.GetFeature(1)
+    if get_spi_state(ds, lyr) != SPI_IN_BUILDING:
+        gdaltest.post_reason('failure')
+        return 'fail'
+    feat = lyr.GetNextFeature()
+    while feat is not None:
+        feat = lyr.GetNextFeature()
+    if get_spi_state(ds, lyr) != SPI_COMPLETED:
+        gdaltest.post_reason('failure')
+        return 'fail'
+    lyr.ResetReading()
+    c = 0
+    feat = lyr.GetNextFeature()
+    while feat is not None:
+        c = c + 1
+        feat = lyr.GetNextFeature()
+    if c != 1:
+        gdaltest.post_reason('failure')
+        return 'fail'
+    feat = None
+    lyr = None
+    ds = None
+
+    # but SetNextByIndex() does
+    ds = ogr.Open('data/testopenfilegdb.gdb.zip')
+    lyr = ds.GetLayerByName('multipolygon')
+    lyr.SetNextByIndex(3)
+    if get_spi_state(ds, lyr) != SPI_INVALID:
+        gdaltest.post_reason('failure')
+        return 'fail'
+    feat = None
+    lyr = None
+    ds = None
+
+    # and ResetReading() as well
+    ds = ogr.Open('data/testopenfilegdb.gdb.zip')
+    lyr = ds.GetLayerByName('multipolygon')
+    feat = lyr.GetNextFeature()
+    lyr.ResetReading()
+    if get_spi_state(ds, lyr) != SPI_INVALID:
+        gdaltest.post_reason('failure')
+        return 'fail'
+    feat = None
+    lyr = None
+    ds = None
+
+    # and SetAttributeFilter() with an index too
+    ds = ogr.Open('data/testopenfilegdb.gdb.zip')
+    lyr = ds.GetLayerByName('point')
+    lyr.SetAttributeFilter('id = 1')
+    if get_spi_state(ds, lyr) != SPI_INVALID:
+        gdaltest.post_reason('failure')
+        return 'fail'
+    feat = None
+    lyr = None
+    ds = None
     return 'success'
 
 ###############################################################################
@@ -769,6 +1148,15 @@ def ogr_openfilegdb_cleanup():
 
     try:
         shutil.rmtree('tmp/testopenfilegdb.gdb')
+    except:
+        pass
+    try:
+        os.remove('tmp/a00000009.gdbtable')
+        os.remove('tmp/a00000009.gdbtablx')
+    except:
+        pass
+    try:
+        shutil.rmtree('tmp/testopenfilegdb_fuzzed.gdb')
     except:
         pass
 
@@ -785,6 +1173,9 @@ gdaltest_list = [
     ogr_openfilegdb_6,
     ogr_openfilegdb_7,
     ogr_openfilegdb_8,
+    ogr_openfilegdb_9,
+    ogr_openfilegdb_10,
+    ogr_openfilegdb_11,
     ogr_openfilegdb_cleanup,
     ]
 

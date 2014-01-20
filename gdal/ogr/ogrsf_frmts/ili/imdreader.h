@@ -2,11 +2,11 @@
  * $Id$
  *
  * Project:  Interlis 1/2 Translator
- * Purpose:   Definition of classes for OGR Interlis 1 driver.
+ * Purpose:  IlisMeta model reader.
  * Author:   Pirmin Kalberer, Sourcepole AG
  *
  ******************************************************************************
- * Copyright (c) 2004, Pirmin Kalberer, Sourcepole AG
+ * Copyright (c) 2014, Pirmin Kalberer, Sourcepole AG
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -27,17 +27,32 @@
  * DEALINGS IN THE SOFTWARE.
  ****************************************************************************/
 
-#ifndef _IOMHELPER_H_INCLUDED
-#define _IOMHELPER_H_INCLUDED
+#ifndef _IMDREADER_H_INCLUDED
+#define _IMDREADER_H_INCLUDED
 
-#include "iom/iom.h"
+#include "cpl_vsi.h"
+#include "cpl_error.h"
+#include "ogr_feature.h"
+#include <list>
 
-IOM_OBJECT GetAttrObj(IOM_BASKET model, IOM_OBJECT obj, const char* attrname);
-int GetAttrObjPos(IOM_OBJECT obj, const char* attrname);
-const char* GetAttrObjName(IOM_BASKET model, IOM_OBJECT obj, const char* attrname);
-IOM_OBJECT GetTypeObj(IOM_BASKET model, IOM_OBJECT obj);
-const char* GetTypeName(IOM_BASKET model, IOM_OBJECT obj);
-unsigned int GetCoordDim(IOM_BASKET model, IOM_OBJECT typeobj);
-const char* GetAttrObjName(IOM_BASKET model, const char* tagname);
 
-#endif /* _IOMHELPER_H_INCLUDED */
+typedef std::list<OGRFeatureDefn*> FeatureDefnList;
+
+class ImdReader
+{
+public:
+    int                  iliVersion; /* 1 or 2 */
+    CPLString            mainModelName;
+    CPLString            mainBasketName;
+    CPLString            mainTopicName;
+    char                 codeBlank;
+    char                 codeUndefined;
+    char                 codeContinue;
+public:
+                         ImdReader(int iliVersion);
+                        ~ImdReader();
+    CPLString            LayerName(const char* psClassTID);
+    FeatureDefnList      ReadModel(const char *pszFilename);
+};
+
+#endif /* _IMDREADER_H_INCLUDED */

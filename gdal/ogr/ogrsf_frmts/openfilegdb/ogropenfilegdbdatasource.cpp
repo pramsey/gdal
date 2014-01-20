@@ -293,38 +293,40 @@ int OGROpenFileGDBDataSource::OpenFileGDBv10(int iGDBItems,
             CPLString osDocumentation( psField != NULL ? psField->String : "" );
 
             psField = oTable.GetFieldValue(iName);
-            std::map<std::string, int>::const_iterator oIter =
-                                        m_osMapNameToIdx.find(psField->String);
-            int idx = 0;
-            if( oIter != m_osMapNameToIdx.end() )
-                idx = oIter->second;
-            if( psField != NULL && idx > 0 && 
-                (nInterestTable < 0 || nInterestTable == idx) )
+            if( psField != NULL )
             {
-                const char* pszFilename = CPLFormFilename(
-                    m_osDirName, CPLSPrintf("a%08x", idx), "gdbtable");
-                if( FileExists(pszFilename) )
+                std::map<std::string, int>::const_iterator oIter =
+                                            m_osMapNameToIdx.find(psField->String);
+                int idx = 0;
+                if( oIter != m_osMapNameToIdx.end() )
+                    idx = oIter->second;
+                if( idx > 0 && (nInterestTable < 0 || nInterestTable == idx) )
                 {
-                    nCandidateLayers ++;
-
-                    if( m_papszFiles != NULL )
+                    const char* pszFilename = CPLFormFilename(
+                        m_osDirName, CPLSPrintf("a%08x", idx), "gdbtable");
+                    if( FileExists(pszFilename) )
                     {
-                        const char* pszSDC = CPLResetExtension(pszFilename, "gdbtable.sdc");
-                        if( FileExists(pszSDC) )
-                        {
-                            nLayersSDC ++;
-                            CPLError(CE_Warning, CPLE_AppDefined,
-                                    "%s layer has a %s file whose format is unhandled",
-                                    psField->String, pszSDC);
-                            continue;
-                        }
-                    }
+                        nCandidateLayers ++;
 
-                    m_apoLayers.push_back(
-                        new OGROpenFileGDBLayer(pszFilename,
-                                                psField->String,
-                                                osDefinition,
-                                                osDocumentation));
+                        if( m_papszFiles != NULL )
+                        {
+                            const char* pszSDC = CPLResetExtension(pszFilename, "gdbtable.sdc");
+                            if( FileExists(pszSDC) )
+                            {
+                                nLayersSDC ++;
+                                CPLError(CE_Warning, CPLE_AppDefined,
+                                        "%s layer has a %s file whose format is unhandled",
+                                        psField->String, pszSDC);
+                                continue;
+                            }
+                        }
+
+                        m_apoLayers.push_back(
+                            new OGROpenFileGDBLayer(pszFilename,
+                                                    psField->String,
+                                                    osDefinition,
+                                                    osDocumentation));
+                    }
                 }
             }
         }
@@ -847,6 +849,23 @@ OGRLayer* OGROpenFileGDBDataSource::ExecuteSQL( const char *pszSQLCommand,
         {
             OGRLayer* poRet = new OGROpenFileGDBSingleFeatureLayer(
                 "LayerAttrIndexUse", CPLSPrintf("%d", poLayer->GetAttrIndexUse()) );
+            return poRet;
+        }
+        else
+            return NULL;
+    }
+
+/* -------------------------------------------------------------------- */
+/*      Special case GetLayerSpatialIndexState (only for debugging purposes) */
+/* -------------------------------------------------------------------- */
+    if (EQUALN(pszSQLCommand, "GetLayerSpatialIndexState ", strlen("GetLayerSpatialIndexState ")))
+    {
+        OGROpenFileGDBLayer* poLayer = (OGROpenFileGDBLayer*)
+            GetLayerByName(pszSQLCommand + strlen("GetLayerSpatialIndexState "));
+        if (poLayer)
+        {
+            OGRLayer* poRet = new OGROpenFileGDBSingleFeatureLayer(
+                "LayerSpatialIndexState", CPLSPrintf("%d", poLayer->GetSpatialIndexState()) );
             return poRet;
         }
         else

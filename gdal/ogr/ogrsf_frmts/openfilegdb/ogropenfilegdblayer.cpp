@@ -57,7 +57,7 @@ class OGROpenFileGDBGeomFieldDefn: public OGRGeomFieldDefn
             if( poSRS )
                 return poSRS;
             if( m_poLayer != NULL )
-                m_poLayer->BuildLayerDefinition();
+                (void) m_poLayer->BuildLayerDefinition();
             return poSRS;
         }
 };
@@ -94,7 +94,7 @@ class OGROpenFileGDBFeatureDefn: public OGRFeatureDefn
             if( !m_bHasBuildFieldDefn && m_poLayer != NULL )
             {
                 m_bHasBuildFieldDefn = TRUE;
-                m_poLayer->BuildLayerDefinition();
+                (void) m_poLayer->BuildLayerDefinition();
             }
             return nFieldCount;
         }
@@ -364,6 +364,8 @@ int OGROpenFileGDBLayer::BuildLayerDefinition()
                 break;
             case FGFT_STRING:
                 nWidth = poGDBField->GetMaxWidth();
+                eType = OFTString;
+                break;
             case FGFT_UUID_1:
             case FGFT_UUID_2:
             case FGFT_XML:
@@ -409,7 +411,7 @@ OGRwkbGeometryType OGROpenFileGDBLayer::GetGeomType()
 {
     if( m_eGeomType == wkbUnknown )
     {
-        BuildLayerDefinition();
+        (void) BuildLayerDefinition();
     }
 
     return m_eGeomType;
@@ -1082,6 +1084,8 @@ OGRErr OGROpenFileGDBLayer::SetAttributeFilter( const char* pszFilter )
         swq_expr_node* poNode = (swq_expr_node*) m_poAttrQuery->GetSWGExpr();
         m_bIteratorSufficientToEvaluateFilter = -1;
         m_poIterator = BuildIteratorFromExprNode(poNode);
+        if( m_poIterator != NULL && m_eSpatialIndexState == SPI_IN_BUILDING )
+            m_eSpatialIndexState = SPI_INVALID;
         if( m_bIteratorSufficientToEvaluateFilter < 0 )
             m_bIteratorSufficientToEvaluateFilter = FALSE;
     }
@@ -1292,11 +1296,16 @@ OGRFeature* OGROpenFileGDBLayer::GetFeature( long nFeatureId )
     /* Temporarily disable spatial filter */
     OGRGeometry* poOldSpatialFilter = m_poFilterGeom;
     m_poFilterGeom = NULL;
+    /* and also spatial index state to avoid features to be inserted */
+    /* multiple times in spatial index */
+    SPIState eOldState = m_eSpatialIndexState;
+    m_eSpatialIndexState = SPI_INVALID;
 
     OGRFeature* poFeature = GetCurrentFeature();
 
     /* Set it back */
     m_poFilterGeom = poOldSpatialFilter;
+    m_eSpatialIndexState = eOldState;
 
     return poFeature;
 }
@@ -1312,6 +1321,9 @@ OGRErr OGROpenFileGDBLayer::SetNextByIndex( long nIndex )
 
     if( !BuildLayerDefinition() )
         return OGRERR_FAILURE;
+
+    if( m_eSpatialIndexState == SPI_IN_BUILDING )
+        m_eSpatialIndexState = SPI_INVALID;
 
     if( m_nFilteredFeatureCount >= 0 )
     {
@@ -1382,6 +1394,14 @@ int OGROpenFileGDBLayer::GetFeatureCount( int bForce )
         int nCount = 0;
         if( m_eSpatialIndexState == SPI_IN_BUILDING && m_iCurFeat != 0 )
             m_eSpatialIndexState = SPI_INVALID;
+        
+        int nFilteredFeatureCountAlloc = 0;
+        if( m_eSpatialIndexState == SPI_IN_BUILDING )
+        {
+            CPLFree(m_pahFilteredFeatures);
+            m_pahFilteredFeatures = NULL;
+            m_nFilteredFeatureCount = 0;
+        }
 
         for(int i=0;i<m_poLyrTable->GetTotalRecordCount();i++)
         {
@@ -1415,12 +1435,30 @@ int OGROpenFileGDBLayer::GetFeatureCount( int bForce )
 
                 if( m_poLyrTable->DoesGeometryIntersectsFilterEnvelope(psField) )
                 {
-                    nCount ++;
+                    OGRGeometry* poGeom = m_poGeomConverter->GetAsGeometry(psField);
+                    if( poGeom != NULL && FilterGeometry( poGeom ))
+                    {
+                        if( m_eSpatialIndexState == SPI_IN_BUILDING )
+                        {
+                            if( nCount == nFilteredFeatureCountAlloc )
+                            {
+                                nFilteredFeatureCountAlloc = 4 * nFilteredFeatureCountAlloc / 3 + 1024;
+                                m_pahFilteredFeatures = (void**)CPLRealloc(
+                                    m_pahFilteredFeatures, sizeof(void*) * nFilteredFeatureCountAlloc);
+                            }
+                            m_pahFilteredFeatures[nCount] = (void*)(size_t)i;
+                        }
+                        nCount ++;
+                    }
+                    delete poGeom;
                 }
             }
         }
         if( m_eSpatialIndexState == SPI_IN_BUILDING )
+        {
+            m_nFilteredFeatureCount = nCount;
             m_eSpatialIndexState = SPI_COMPLETED;
+        }
 
         return nCount;
     }
