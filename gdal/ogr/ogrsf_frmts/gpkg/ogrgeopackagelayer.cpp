@@ -199,43 +199,6 @@ OGRErr OGRGeoPackageLayer::ReadFeature( sqlite3_stmt *poQuery, OGRFeature **ppoF
 
 
 
-OGRErr OGRGeoPackageLayer::GetLastFid( int *pnFid )
-{
-    int err;
-    
-    if ( ! (m_pszTableName && pnFid) ) return OGRERR_FAILURE;
-    
-    if ( ! m_poFidStatement )
-    {
-        CPLString osCommand = "SELECT seq FROM sqlite_sequence WHERE name = ?";
-        err = sqlite3_prepare_v2(m_poDS->GetDatabaseHandle(), osCommand, -1, &m_poFidStatement, NULL);
-        if ( err != SQLITE_OK )
-        {
-            m_poFidStatement = NULL;
-            CPLError( CE_Failure, CPLE_AppDefined,
-                      "failed to prepare SQL: %s", osCommand.c_str());
-            return OGRERR_FAILURE;
-        }
-    }
-
-    err = sqlite3_bind_text(m_poFidStatement, 1, m_pszTableName, strlen(m_pszTableName), NULL);
-    if ( err != SQLITE_OK )
-        return OGRERR_FAILURE;
-
-    err = sqlite3_step(m_poFidStatement);
-    if ( err != SQLITE_ROW )
-    {
-        return OGRERR_FAILURE;
-    }
-    
-    *pnFid = sqlite3_column_int(m_poFidStatement, 0);
-    
-    sqlite3_reset(m_poFidStatement);
-        
-    return OGRERR_NONE;
-}
-
-
 //----------------------------------------------------------------------
 // IsGeomFieldSet()
 // 
@@ -844,7 +807,7 @@ OGRErr OGRGeoPackageLayer::CreateFeature( OGRFeature *poFeature )
 
     /* Read the latest FID value */
     int iFid;
-    if ( GetLastFid(&iFid) == OGRERR_NONE )
+    if ( (iFid = sqlite3_last_insert_rowid(m_poDS->GetDatabaseHandle())) )
     {
         poFeature->SetFID(iFid);
     }

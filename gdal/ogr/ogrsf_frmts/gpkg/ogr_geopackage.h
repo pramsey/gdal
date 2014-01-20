@@ -175,7 +175,6 @@ class OGRGeoPackageLayer : public OGRLayer
     OGRErr              FeatureBindUpdateParameters( OGRFeature *poFeature, sqlite3_stmt *poStmt );
     OGRErr              FeatureBindInsertParameters( OGRFeature *poFeature, sqlite3_stmt *poStmt );
     OGRErr              FeatureBindParameters( OGRFeature *poFeature, sqlite3_stmt *poStmt, int *pnColCount );
-    OGRErr              GetLastFid( int *pnFid );
 
 };
 
