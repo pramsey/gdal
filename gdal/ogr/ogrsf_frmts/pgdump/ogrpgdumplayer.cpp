@@ -506,6 +506,7 @@ void OGRPGCommonAppendCopyFieldsExceptGeom(CPLString& osCommand,
 
     int nFieldCount = poFeatureDefn->GetFieldCount();
     int bAddTab = osCommand.size() > 0; 
+    int bIsDateNull = FALSE;
 
     for( i = 0; i < nFieldCount;  i++ )
     {
@@ -519,14 +520,27 @@ void OGRPGCommonAppendCopyFieldsExceptGeom(CPLString& osCommand,
             osCommand += "\t";
         bAddTab = TRUE; 
 
-        if( !poFeature->IsFieldSet( i ) )
+        int nOGRFieldType = poFeatureDefn->GetFieldDefn(i)->GetType();
+
+        int bNullBadDates = CPLTestBool(CPLGetConfigOption("OGR_PG_BAD_DATES_AS_NULL", "NO"));
+        if( bNullBadDates && nOGRFieldType == OFTDate && poFeature->IsFieldSet(i) )
+        {
+        	int nYear, nMonth, nDay, nHour, nMinute, nTZFlag;
+            float fSecond;
+
+            int bParsed = poFeature->GetFieldAsDateTime(i, &nYear, &nMonth, &nDay, &nHour, &nMinute, &fSecond, &nTZFlag);
+            if ( (!bParsed) || nYear < 1 || nMonth < 1 || nDay < 1 )
+            {
+                bIsDateNull = TRUE;
+            }                
+        }
+
+        if( !poFeature->IsFieldSet( i ) || bIsDateNull )
         {
             osCommand += "\\N" ;
 
             continue;
         }
-
-        int nOGRFieldType = poFeatureDefn->GetFieldDefn(i)->GetType();
 
         // We need special formatting for integer list values.
         if( nOGRFieldType == OFTIntegerList )
@@ -1089,6 +1103,21 @@ void OGRPGCommonAppendFieldValue(CPLString& osCommand,
             pszStrValue = "NULL";
             bIsDateNull = TRUE;
         }
+
+        int bNullBadDates = CPLTestBool(CPLGetConfigOption("OGR_PG_BAD_DATES_AS_NULL", "NO"));
+        if( bNullBadDates && poFeature->IsFieldSet(i) )
+        {
+        	int nYear, nMonth, nDay, nHour, nMinute, nTZFlag;
+            float fSecond;
+
+            int bParsed = poFeature->GetFieldAsDateTime(i, &nYear, &nMonth, &nDay, &nHour, &nMinute, &fSecond, &nTZFlag);
+            if ( (!bParsed) || nYear < 1 || nMonth < 1 || nDay < 1 )
+            {
+                pszStrValue = "NULL";
+                bIsDateNull = TRUE;
+            }                
+        }
+
     }
     else if ( nOGRFieldType == OFTReal )
     {
